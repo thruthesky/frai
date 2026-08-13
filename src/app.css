@@ -1,10 +1,23 @@
-/* 색은 전부 토큰으로 정의한다. 라이트/다크 양쪽을 지원하되 기본은 다크다. */
+/* ── 디자인 토큰 ────────────────────────────────────────────────────────────
+   여기 정의된 값 밖의 숫자를 컴포넌트 CSS 에 직접 쓰지 않는다. 새 값이 필요하면
+   먼저 이 파일에 토큰을 추가한다. 간격·라디우스·글자·그림자·모션이 흩어져 있으면
+   화면이 "스케일 없는 문서"로 읽힌다.
+
+   ⚠️ 이 파일에서 color-mix() 를 쓰지 않는다.
+   tauri.conf.json 이 minimumSystemVersion "11.0" 을 선언하고 있어 color-mix() 를
+   모르는 구형 WebKit 이 사양 안에 들어온다. 미지원 환경에서는 선언이 통째로 무효가
+   되어 배지 배경이 투명해진다. 알파가 필요하면 rgb(R G B / A) 고정값으로 적는다. */
 :root {
-  --bg: #16181d;
-  --panel: #1c1f26;
-  --panel-head: #21242c;
-  --input: #262a33;
-  --line: #30353f;
+  /* 표면 램프 — 청계열 hue 를 유지하되 레이어 간 명도차를 넓혔다.
+     이전 값(#16181d → #1c1f26 → #21242c)은 채널당 차이가 5~9 뿐이라
+     카드·헤더·입력이 한 덩어리 회색으로 뭉쳐 보였다. */
+  --bg: #0d0f14;
+  --surface-1: #161a21; /* 카드 */
+  --surface-2: #1f242e; /* 카드 헤더 · 크롬 */
+  --surface-3: #2a303c; /* 입력 · 칩 */
+  --line: #333a47;
+  --line-strong: #434b5a;
+
   --fg: #e6e8ec;
   --muted: #8b93a1;
   --accent: #6ea8fe;
@@ -12,21 +25,70 @@
   --warn: #e0a458;
   --danger: #ef6f6f;
 
+  /* 상태 배경 — color-mix 대신 고정 알파 */
+  --ok-bg: rgb(78 201 165 / 0.2);
+  --warn-bg: rgb(224 164 88 / 0.22);
+  --danger-bg: rgb(239 111 111 / 0.12);
+  --accent-bg: rgb(110 168 254 / 0.2);
+  /* 칸반 드롭 대상 강조. 알파가 아니라 불투명 색이어야 한다 —
+     원래 값이 accent 7% 를 카드 배경과 섞은 것이라 투명도가 아니었다. */
+  --panel-hover: #1c2430;
+
+  /* 레거시 별칭. 컴포넌트를 점진 이관하는 동안 유지한다 —
+     한 번에 전부 rename 하면 되돌리기가 어렵다. */
+  --panel: var(--surface-1);
+  --panel-head: var(--surface-2);
+  --input: var(--surface-3);
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-full: 999px;
+
+  --fs-xs: 11px;
+  --fs-sm: 12px;
+  --fs-md: 13px;
+  --fs-base: 14px;
+  /* 위계는 크기만이 아니라 굵기·색으로도 만든다. */
+  --fw-medium: 550;
+  --fw-bold: 680;
+
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.28);
+  --shadow-2:
+    0 4px 12px rgb(0 0 0 / 0.32),
+    0 1px 2px rgb(0 0 0 / 0.2);
+  --shadow-focus: 0 0 0 3px rgb(110 168 254 / 0.3);
+
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --dur: 140ms;
+
+  /* 크롬 높이. main 의 높이 계산이 이 값을 참조한다. */
+  --titlebar-h: 38px;
+
   color-scheme: dark;
   font-family:
     -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Pretendard', system-ui, sans-serif;
-  font-size: 14px;
+  font-size: var(--fs-base);
   color: var(--fg);
   background: var(--bg);
 }
 
 @media (prefers-color-scheme: light) {
   :root {
-    --bg: #f6f7f9;
-    --panel: #ffffff;
-    --panel-head: #f0f2f5;
-    --input: #f2f4f7;
-    --line: #dde1e7;
+    --bg: #eceef2;
+    --surface-1: #ffffff;
+    --surface-2: #f5f7fa;
+    --surface-3: #e9edf3;
+    --line: #d8dde5;
+    --line-strong: #c2c9d4;
+
     --fg: #1a1d23;
     --muted: #6b7280;
     --accent: #2f6fd0;
@@ -34,7 +96,37 @@
     --warn: #b5711a;
     --danger: #c53a3a;
 
+    --ok-bg: rgb(31 157 118 / 0.14);
+    --warn-bg: rgb(181 113 26 / 0.15);
+    --danger-bg: rgb(197 58 58 / 0.12);
+    --accent-bg: rgb(47 111 208 / 0.14);
+    --panel-hover: #f0f5fc;
+
+    /* 다크의 짙은 그림자를 라이트에 그대로 쓰면 탁해진다. */
+    --shadow-1: 0 1px 2px rgb(15 23 42 / 0.07);
+    --shadow-2:
+      0 6px 16px rgb(15 23 42 / 0.1),
+      0 1px 2px rgb(15 23 42 / 0.06);
+    --shadow-focus: 0 0 0 3px rgb(47 111 208 / 0.28);
+
     color-scheme: light;
+  }
+}
+
+/* 모션을 원치 않는 사용자를 위해 --dur 을 0 으로 만든다. 이 토큰을 쓰는 모든
+   transition 이 한 번에 무력화된다. duration 토큰을 쓰지 않는 keyframes
+   애니메이션(캐럿 깜빡임)은 아래 전역 규칙이 따로 멈춘다. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur: 0ms;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 
@@ -50,18 +142,34 @@ body {
   background: var(--bg);
 }
 
+/* 앱 셸. 세로 flex 로 두어 타이틀바·(조건부) 인증 안내·본문이 높이를 나눠 갖는다.
+   본문에 calc(100vh - 38px) 같은 고정 계산을 쓰면 인증 안내가 떴을 때 그 높이만큼
+   화면 밖으로 밀려 하단 상태바가 잘린다(body 가 overflow:hidden 이라 스크롤도 안 된다). */
+#app {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
 button {
-  background: var(--input);
+  background: var(--surface-3);
   color: var(--fg);
   border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 6px 10px;
+  border-radius: var(--r-sm);
+  padding: var(--space-2) var(--space-3);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   cursor: pointer;
+  /* 색만 전환한다. height·padding 에 transition 을 걸면 스트리밍으로 내용이
+     늘어날 때 레이아웃 전체가 애니메이션된다. */
+  transition:
+    background-color var(--dur) var(--ease),
+    border-color var(--dur) var(--ease),
+    box-shadow var(--dur) var(--ease);
 }
 button:hover:not(:disabled) {
-  border-color: var(--accent);
+  border-color: var(--line-strong);
+  background: var(--surface-2);
 }
 button:disabled {
   opacity: 0.45;
@@ -70,25 +178,23 @@ button:disabled {
 button.ghost {
   background: transparent;
   border-color: transparent;
-  padding: 4px 7px;
+  padding: var(--space-1) var(--space-2);
 }
-button.ghost:hover {
-  background: var(--input);
+button.ghost:hover:not(:disabled) {
+  background: var(--surface-3);
+  border-color: transparent;
 }
 
 input:focus-visible,
 textarea:focus-visible,
 select:focus-visible,
-button:focus-visible {
+button:focus-visible,
+[role='option']:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
 
-::-webkit-scrollbar {
-  width: 9px;
-  height: 9px;
-}
-::-webkit-scrollbar-thumb {
-  background: var(--line);
-  border-radius: 5px;
-}
+/* ⚠️ ::-webkit-scrollbar 를 정의하지 않는다.
+   그 의사요소를 선언하는 순간 WebKit 이 커스텀(레거시) 스크롤바 경로로 전환되어,
+   macOS 의 오버레이 스크롤바(자동 숨김 · 사용자 시스템 설정 존중)를 쓰지 않고
+   폭을 상시 점유한다. 규칙을 두지 않는 것이 곧 플랫폼 기본 동작이다. */

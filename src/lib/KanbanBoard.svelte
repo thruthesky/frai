@@ -138,8 +138,8 @@
     flex: 1;
     min-height: 0;
     display: flex;
-    gap: 10px;
-    padding: 10px;
+    gap: var(--space-3);
+    padding: var(--space-3);
     overflow-x: auto;
     align-items: flex-start;
   }
@@ -150,23 +150,29 @@
     min-width: 280px;
     max-width: 280px;
     max-height: 100%;
-    background: var(--panel);
+    background: var(--surface-1);
     border: 1px solid var(--line);
-    border-radius: 10px;
+    border-radius: var(--r-md);
+    box-shadow: var(--shadow-1);
     overflow: hidden;
+    transition:
+      border-color var(--dur) var(--ease),
+      background-color var(--dur) var(--ease);
   }
   .column.hover {
     border-color: var(--accent);
-    background: color-mix(in srgb, var(--accent) 7%, var(--panel));
+    /* 알파가 아니라 불투명 색이다 — 원래 값이 accent 를 카드 배경과 섞은 것이라
+       투명도로 바꾸면 뒤 배경이 비쳐 다른 색이 된다. */
+    background: var(--panel-hover);
   }
 
   header {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 8px 10px;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
     border-bottom: 1px solid var(--line);
-    background: var(--panel-head);
+    background: var(--surface-2);
   }
   .spacer {
     flex: 1;
@@ -174,54 +180,61 @@
   .title {
     background: none;
     border: none;
-    padding: 2px 4px;
-    font-weight: 600;
-    font-size: 13px;
+    padding: 2px var(--space-1);
+    font-weight: var(--fw-bold);
+    font-size: var(--fs-md);
     color: var(--fg);
     cursor: text;
   }
   .title:hover {
-    background: var(--input);
-    border-radius: 4px;
+    background: var(--surface-3);
+    border-radius: var(--r-sm);
   }
   .rename {
-    background: var(--input);
+    background: var(--surface-3);
     color: var(--fg);
     border: 1px solid var(--accent);
-    border-radius: 4px;
-    padding: 2px 5px;
+    border-radius: var(--r-sm);
+    padding: 2px var(--space-1);
     font: inherit;
-    font-size: 13px;
-    font-weight: 600;
+    font-size: var(--fs-md);
+    font-weight: var(--fw-bold);
     width: 130px;
   }
   .count {
-    font-size: 11px;
+    font-size: var(--fs-xs);
     color: var(--muted);
-    background: var(--input);
-    border-radius: 999px;
-    padding: 1px 7px;
+    background: var(--surface-3);
+    border-radius: var(--r-full);
+    padding: 1px var(--space-2);
   }
 
   .cards {
     flex: 1;
     min-height: 60px;
     overflow-y: auto;
-    padding: 8px;
+    padding: var(--space-2);
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--space-2);
   }
 
   .card {
     background: var(--bg);
     border: 1px solid var(--line);
-    border-radius: 8px;
-    padding: 8px 9px;
+    border-radius: var(--r-sm);
+    padding: var(--space-2);
     cursor: grab;
+    transition:
+      border-color var(--dur) var(--ease),
+      box-shadow var(--dur) var(--ease);
   }
   .card:hover {
-    border-color: var(--accent);
+    border-color: var(--line-strong);
+    box-shadow: var(--shadow-1);
+  }
+  .card:active {
+    cursor: grabbing;
   }
   .card.dragging {
     opacity: 0.45;
@@ -238,7 +251,7 @@
     cursor: pointer;
   }
   .card-title {
-    font-size: 13px;
+    font-size: var(--fs-md);
     line-height: 1.4;
     word-break: break-word;
   }
@@ -246,67 +259,68 @@
   .meta {
     display: flex;
     align-items: center;
-    gap: 4px;
-    margin-top: 7px;
+    gap: var(--space-1);
+    margin-top: var(--space-2);
     flex-wrap: wrap;
   }
   .chip {
-    font-size: 10px;
-    padding: 1px 6px;
-    border-radius: 999px;
-    background: var(--input);
+    font-size: var(--fs-xs);
+    padding: 1px var(--space-2);
+    border-radius: var(--r-full);
+    background: var(--surface-3);
     color: var(--muted);
     white-space: nowrap;
   }
   .chip.warn {
-    background: color-mix(in srgb, var(--warn) 22%, transparent);
+    background: var(--warn-bg);
     color: var(--warn);
   }
   .chip.ok {
-    background: color-mix(in srgb, var(--ok) 20%, transparent);
+    background: var(--ok-bg);
     color: var(--ok);
   }
   .chip.live {
-    background: color-mix(in srgb, var(--accent) 20%, transparent);
+    background: var(--accent-bg);
     color: var(--accent);
   }
   .chip.danger {
-    background: color-mix(in srgb, var(--danger) 18%, transparent);
+    background: var(--danger-bg);
     color: var(--danger);
   }
   .count-msg {
-    font-size: 10px;
+    font-size: var(--fs-xs);
     color: var(--muted);
   }
 
   .empty {
     margin: 0;
-    padding: 14px 8px;
+    padding: var(--space-4) var(--space-2);
     text-align: center;
-    font-size: 11px;
+    font-size: var(--fs-xs);
     color: var(--muted);
     border: 1px dashed var(--line);
-    border-radius: 8px;
+    border-radius: var(--r-sm);
   }
 
   footer {
-    padding: 6px 8px 8px;
+    padding: var(--space-2);
   }
   .add {
     width: 100%;
-    font-size: 12px;
+    font-size: var(--fs-sm);
   }
 
   .add-column {
     min-width: 130px;
-    padding: 10px;
+    padding: var(--space-3);
     border: 1px dashed var(--line);
-    border-radius: 10px;
+    border-radius: var(--r-md);
     background: transparent;
     color: var(--muted);
   }
   .add-column:hover {
     border-color: var(--accent);
     color: var(--accent);
+    background: transparent;
   }
 </style>

@@ -90,7 +90,7 @@
   {#if !store.ready}
     <p class="loading">프로바이더를 확인하는 중…</p>
   {:else if store.view === 'grid'}
-    <div class="grid" style="--cols: {store.columns}">
+    <div class="grid" data-cols={store.columns}>
       {#each store.sessions as session (session.id)}
         <SessionCard {session} />
       {/each}
@@ -112,47 +112,51 @@
 
 <style>
   .titlebar {
-    height: 38px;
+    height: var(--titlebar-h);
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--space-3);
     /* 왼쪽 신호등 버튼과 겹치지 않도록 비워 둔다. */
     padding-inline-start: 84px;
-    padding-inline-end: 10px;
-    border-bottom: 1px solid var(--line);
-    background: var(--panel-head);
+    padding-inline-end: var(--space-3);
+    background: var(--surface-2);
     user-select: none;
   }
   .brand {
-    font-weight: 700;
+    font-weight: var(--fw-bold);
     letter-spacing: 0.04em;
   }
   .tagline {
-    font-size: 12px;
+    font-size: var(--fs-sm);
     color: var(--muted);
   }
 
   .viewswitch {
     display: flex;
     gap: 2px;
-    background: var(--input);
-    border-radius: 7px;
+    background: var(--surface-3);
+    border-radius: var(--r-sm);
     padding: 2px;
   }
   .viewswitch button {
     border: none;
     background: transparent;
-    font-size: 12px;
-    padding: 4px 10px;
-    border-radius: 5px;
+    font-size: var(--fs-sm);
+    padding: var(--space-1) var(--space-3);
+    border-radius: var(--r-sm);
+  }
+  .viewswitch button:hover:not(:disabled) {
+    background: var(--surface-2);
   }
   .viewswitch button.on {
-    background: var(--panel);
+    background: var(--surface-1);
     color: var(--accent);
+    font-weight: var(--fw-medium);
+    box-shadow: var(--shadow-1);
   }
 
   .account {
-    font-size: 12px;
+    font-size: var(--fs-sm);
     max-width: 220px;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -161,29 +165,34 @@
 
   .authbar {
     margin: 0;
-    padding: 6px 12px;
-    font-size: 12px;
+    padding: var(--space-2) var(--space-3);
+    font-size: var(--fs-sm);
     color: var(--muted);
-    background: var(--panel-head);
-    border-bottom: 1px solid var(--line);
+    background: var(--surface-2);
   }
   .authbar.error {
     color: var(--danger);
-    background: color-mix(in srgb, var(--danger) 10%, transparent);
+    background: var(--danger-bg);
   }
 
+  /* 높이를 계산하지 않는다 — #app 이 세로 flex 라 남은 공간을 그대로 받는다.
+     인증 안내가 떠도 하단 상태바가 잘리지 않는다. */
   main {
     display: flex;
     flex-direction: column;
-    height: calc(100vh - 38px);
+    flex: 1;
     min-height: 0;
   }
 
+  /* 타이틀바와 같은 배경을 쓰고 사이 경계선을 두지 않는다. 두 줄이 하나의 크롬으로
+     읽히게 하려는 것이며, 물리적으로 한 줄로 합치지는 않는다 — 타이틀바를 컨트롤로
+     채우면 data-tauri-drag-region 이 사라져 창을 움직일 수 없게 된다. */
   .toolbar {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 8px 12px;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    background: var(--surface-2);
     border-bottom: 1px solid var(--line);
   }
   .spacer {
@@ -192,43 +201,57 @@
   .cols {
     display: flex;
     align-items: center;
-    gap: 6px;
-    font-size: 12px;
+    gap: var(--space-2);
+    font-size: var(--fs-sm);
     color: var(--muted);
   }
-  .cols input {
-    width: 90px;
-  }
   .hint {
-    font-size: 12px;
+    font-size: var(--fs-sm);
     color: var(--muted);
   }
 
   .broadcast {
     display: flex;
-    gap: 6px;
+    gap: var(--space-2);
     flex: 1;
     max-width: 560px;
   }
   .broadcast input {
     flex: 1;
-    background: var(--input);
+    background: var(--surface-3);
     color: var(--fg);
     border: 1px solid var(--line);
-    border-radius: 6px;
-    padding: 6px 9px;
+    border-radius: var(--r-sm);
+    padding: var(--space-2) var(--space-3);
     font: inherit;
-    font-size: 13px;
+    font-size: var(--fs-md);
+    transition: border-color var(--dur) var(--ease);
+  }
+  .broadcast input:focus-visible {
+    border-color: var(--accent);
   }
 
+  /* ⚠️ minmax(0, 1fr) 을 1fr 로 줄이지 말 것. 그리드 아이템의 기본 min-width:auto 가
+     살아나면 카드 안의 nowrap 요소(배지)가 열 너비를 밀어낸다. */
   .grid {
     flex: 1;
     min-height: 0;
     display: grid;
-    grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
-    gap: 10px;
-    padding: 10px;
+    gap: var(--space-3);
+    padding: var(--space-3);
     overflow-y: auto;
+  }
+  .grid[data-cols='1'] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .grid[data-cols='2'] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .grid[data-cols='3'] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .grid[data-cols='4'] {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .loading {
@@ -238,13 +261,22 @@
 
   .statusbar {
     display: flex;
-    gap: 6px;
-    padding: 5px 12px;
-    font-size: 11px;
+    gap: var(--space-2);
+    padding: var(--space-1) var(--space-3);
+    font-size: var(--fs-xs);
     color: var(--muted);
     border-top: 1px solid var(--line);
+    background: var(--surface-2);
   }
   .live {
     color: var(--accent);
+  }
+
+  /* 좁은 창에서는 마케팅 문구를 숨긴다 — 앱 크롬에 카피가 있는 것 자체가
+     "웹사이트" 신호이고, 800px 에서는 자리도 없다. */
+  @media (max-width: 1100px) {
+    .tagline {
+      display: none;
+    }
   }
 </style>
