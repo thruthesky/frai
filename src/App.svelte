@@ -1,7 +1,17 @@
 <script lang="ts">
   import KanbanBoard from './lib/KanbanBoard.svelte'
   import SessionCard from './lib/SessionCard.svelte'
+  import Icon from './lib/ui/Icon.svelte'
+  import Segmented from './lib/ui/Segmented.svelte'
   import { store } from './lib/sessions.svelte'
+
+  /** 그리드 열 수. 값이 넷뿐이라 슬라이더가 아니라 세그먼티드가 맞다. */
+  const COLUMN_OPTIONS = [
+    { value: 1, label: '1' },
+    { value: 2, label: '2' },
+    { value: 3, label: '3' },
+    { value: 4, label: '4' },
+  ]
 
   let broadcast = $state('')
 
@@ -59,13 +69,20 @@
 <main>
   <div class="toolbar">
     {#if store.view === 'grid'}
-      <label class="cols">
-        열
-        <input type="range" min="1" max="4" bind:value={store.columns} />
-        <span>{store.columns}</span>
-      </label>
+      <div class="cols">
+        <span>열</span>
+        <Segmented
+          value={store.columns}
+          options={COLUMN_OPTIONS}
+          ariaLabel="그리드 열 수"
+          onchange={(value) => (store.columns = value)}
+        />
+      </div>
 
-      <button onclick={() => store.add()}>+ 세션 추가</button>
+      <button onclick={() => store.add()}>
+        <Icon name="plus" size={14} />
+        세션 추가
+      </button>
 
       <span class="spacer"></span>
 
@@ -77,13 +94,17 @@
           disabled={selectedCount === 0}
         />
         <button onclick={sendAll} disabled={!broadcast.trim() || selectedCount === 0}>
+          <Icon name="send" size={14} />
           전체 전송
         </button>
       </div>
     {:else}
       <span class="hint">카드를 끌어서 칸 사이로 옮길 수 있습니다. 칸 이름을 누르면 이름을 바꿉니다.</span>
       <span class="spacer"></span>
-      <button onclick={() => store.addColumn()}>+ 칸 추가</button>
+      <button onclick={() => store.addColumn()}>
+        <Icon name="plus" size={14} />
+        칸 추가
+      </button>
     {/if}
   </div>
 
@@ -252,6 +273,17 @@
   }
   .grid[data-cols='4'] {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  /* 열이 늘수록 카드가 좁아진다 — 창 최소 폭 800px 에서 4열이면 카드가 190px 안팎이라
+     헤더(토글 + 프로바이더 + 배지 + 닫기)만으로 이미 빠듯하다. 좁은 열에서는 배지와
+     제목의 글자를 지우고 아이콘만 남긴다. 의미는 aria-label·title 이 계속 전달한다.
+     :global 이 필요한 이유는 이 요소들이 자식 컴포넌트(SessionCard) 안에 있어서다. */
+  .grid[data-cols='3'] :global(.tag-label),
+  .grid[data-cols='4'] :global(.tag-label),
+  .grid[data-cols='4'] :global(.session-title),
+  .grid[data-cols='4'] :global(header .btn-label) {
+    display: none;
   }
 
   .loading {

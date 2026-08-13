@@ -21,6 +21,9 @@
   --fg: #e6e8ec;
   --muted: #8b93a1;
   --accent: #6ea8fe;
+  /* accent 를 배경으로 깔았을 때의 글자색. 다크의 accent 는 밝은 파랑이라
+     검은 계열이, 라이트의 accent 는 짙은 파랑이라 흰색이 읽힌다. */
+  --on-accent: #0d0f14;
   --ok: #4ec9a5;
   --warn: #e0a458;
   --danger: #ef6f6f;
@@ -92,6 +95,7 @@
     --fg: #1a1d23;
     --muted: #6b7280;
     --accent: #2f6fd0;
+    --on-accent: #ffffff;
     --ok: #1f9d76;
     --warn: #b5711a;
     --danger: #c53a3a;
@@ -152,6 +156,10 @@ body {
 }
 
 button {
+  /* 아이콘과 글자를 나란히 두기 위한 기본값. 글자만 있는 버튼에는 영향이 없다. */
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
   background: var(--surface-3);
   color: var(--fg);
   border: 1px solid var(--line);

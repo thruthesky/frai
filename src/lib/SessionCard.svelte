@@ -1,5 +1,6 @@
 <script lang="ts">
   import { store, type Session } from './sessions.svelte'
+  import Icon from './ui/Icon.svelte'
 
   let { session }: { session: Session } = $props()
 
@@ -8,6 +9,8 @@
 
   const provider = $derived(store.provider(session.providerId))
   const canRemove = $derived(store.sessions.length > 1)
+  /** 제목은 첫 질문에서 만들어지므로, 질문이 없으면 "새 세션 s1" 같은 소음이 된다. */
+  const hasQuestion = $derived(session.messages.some((m) => m.role === 'user'))
 
   /**
    * 사용자가 위로 올려 읽는 중인가. 새 내용이 붙어도 그때는 따라가지 않는다.
@@ -51,14 +54,26 @@
   }
 </script>
 
-<section class="card" class:busy={session.streaming}>
+<!--
+  선택(chosen)과 스트리밍(busy)은 서로 다른 축이라 표현 수단을 나눈다 —
+  선택은 카드 전체의 밝기로, 스트리밍은 테두리 색으로. 둘은 동시에 성립할 수 있다.
+-->
+<section class="card" class:busy={session.streaming} class:chosen={session.selected}>
   <header>
-    <input
-      type="checkbox"
-      bind:checked={session.selected}
+    <!--
+      네이티브 checkbox 대신 토글 버튼을 쓴다. 카드 전체를 클릭 대상으로 만들지 않는
+      이유는 카드 안에 textarea·스크롤 영역이 있어 텍스트 선택·입력과 충돌하기 때문이다.
+    -->
+    <button
+      class="pick"
+      type="button"
+      aria-pressed={session.selected}
       title="전체 전송 대상에 포함"
       aria-label="전체 전송 대상에 포함"
-    />
+      onclick={() => (session.selected = !session.selected)}
+    >
+      <Icon name="check" size={12} />
+    </button>
 
     <select bind:value={session.providerId} disabled={session.streaming}>
       {#each store.providers as p (p.id)}
@@ -70,21 +85,41 @@
 
     {#if provider?.leavesDevice}
       <span class="tag warn" title="이 경로는 대화 내용이 getpes.com 서버를 지납니다.">
-        서버 경유
+        <Icon name="globe" size={11} />
+        <span class="tag-label">서버 경유</span>
       </span>
     {:else if provider?.kind === 'cli'}
-      <span class="tag ok" title="로컬에서 실행됩니다. 추가 비용이 없습니다.">로컬</span>
+      <span class="tag ok" title="로컬에서 실행됩니다. 추가 비용이 없습니다.">
+        <Icon name="cpu" size={11} />
+        <span class="tag-label">로컬</span>
+      </span>
     {/if}
 
     <span class="spacer"></span>
 
     {#if session.streaming}
-      <button class="ghost" onclick={() => store.cancel(session)}>중단</button>
+      <button class="ghost" onclick={() => store.cancel(session)} aria-label="응답 중단">
+        <Icon name="stop" size={13} />
+        <span class="btn-label">중단</span>
+      </button>
     {/if}
     {#if canRemove}
-      <button class="ghost" onclick={() => store.remove(session)} title="세션 닫기">✕</button>
+      <button
+        class="ghost"
+        onclick={() => store.remove(session)}
+        title="세션 닫기"
+        aria-label="이 세션 닫기"
+      >
+        <Icon name="x" />
+      </button>
     {/if}
   </header>
+
+  <!-- 제목은 좁은 열에서 숨긴다(App.svelte 의 data-cols 규칙). 4열에서는 카드 너비가
+       190px 안팎이라 헤더만으로도 이미 빠듯하다. -->
+  {#if hasQuestion}
+    <p class="session-title" title={session.displayTitle}>{session.displayTitle}</p>
+  {/if}
 
   {#if provider?.reason}
     <p class="notice">{provider.reason}</p>
@@ -103,7 +138,10 @@
     {/if}
 
     {#if session.error}
-      <p class="error">{session.error}</p>
+      <p class="error">
+        <Icon name="alert" size={14} />
+        <span>{session.error}</span>
+      </p>
     {/if}
   </div>
 
@@ -115,7 +153,10 @@
       placeholder="메시지 입력 (Enter 전송 · Shift+Enter 줄바꿈)"
       disabled={session.streaming}
     ></textarea>
-    <button onclick={submit} disabled={session.streaming || !input.trim()}>보내기</button>
+    <button onclick={submit} disabled={session.streaming || !input.trim()} aria-label="보내기">
+      <Icon name="send" size={14} />
+      <span class="btn-label">보내기</span>
+    </button>
   </footer>
 
   {#if session.usage}
@@ -152,6 +193,46 @@
   .card.busy {
     border-color: var(--accent);
   }
+  /* 선택된 것을 강조하는 대신 선택 안 된 것을 물러나게 한다. 기본값이 "전부 선택"
+     이라(sessions.svelte.ts 의 selected = true) 강조 방식을 쓰면 첫 화면이 통째로
+     accent 덩어리가 된다. */
+  .card:not(.chosen) {
+    opacity: 0.78;
+  }
+
+  .pick {
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    justify-content: center;
+    border-radius: var(--r-sm);
+    background: transparent;
+    border-color: var(--line-strong);
+    /* 체크 표시는 선택됐을 때만 보인다. 자리는 늘 차지해 레이아웃이 흔들리지 않는다. */
+    color: transparent;
+  }
+  .pick[aria-pressed='true'] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--on-accent);
+  }
+  .pick:hover:not([aria-pressed='true']) {
+    background: var(--surface-3);
+    border-color: var(--line-strong);
+  }
+
+  .session-title {
+    margin: 0;
+    padding: var(--space-2) var(--space-3);
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    color: var(--fg);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    border-bottom: 1px solid var(--line);
+    background: var(--surface-2);
+  }
 
   header {
     display: flex;
@@ -176,6 +257,9 @@
   }
 
   .tag {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
     font-size: var(--fs-xs);
     padding: 2px var(--space-2);
     border-radius: var(--r-full);
@@ -253,6 +337,9 @@
     text-align: center;
   }
   .error {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-2);
     color: var(--danger);
     font-size: var(--fs-sm);
     background: var(--danger-bg);

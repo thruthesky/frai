@@ -1,5 +1,6 @@
 <script lang="ts">
   import { store, type Column, type Session } from './sessions.svelte'
+  import Icon from './ui/Icon.svelte'
 
   /** 지금 끌고 있는 세션. 드롭 대상 강조와 이동에 쓴다. */
   let dragging = $state<Session | null>(null)
@@ -74,8 +75,15 @@
         <span class="spacer"></span>
 
         {#if !col.fixed}
-          <button class="ghost" onclick={() => store.removeColumn(col.id)} title="칸 삭제 (세션은 Backlog 로 이동)">
-            ✕
+          <!-- 아이콘만 있는 버튼이므로 aria-label 이 반드시 필요하다. title 은 일부
+               스크린리더가 읽지 않아 이름 역할을 대신하지 못한다. -->
+          <button
+            class="ghost"
+            onclick={() => store.removeColumn(col.id)}
+            title="칸 삭제 (세션은 Backlog 로 이동)"
+            aria-label="{col.title} 칸 삭제. 안에 있던 세션은 Backlog 로 이동합니다"
+          >
+            <Icon name="x" />
           </button>
         {/if}
       </header>
@@ -125,12 +133,18 @@
           store.add()
           const created = store.sessions[store.sessions.length - 1]
           created.columnId = col.id
-        }}>+ 세션</button>
+        }}>
+          <Icon name="plus" size={14} />
+          세션
+        </button>
       </footer>
     </section>
   {/each}
 
-  <button class="add-column" onclick={() => store.addColumn()}>+ 칸 추가</button>
+  <button class="add-column" onclick={() => store.addColumn()}>
+    <Icon name="plus" size={14} />
+    칸 추가
+  </button>
 </div>
 
 <style>
@@ -307,11 +321,13 @@
   }
   .add {
     width: 100%;
+    justify-content: center;
     font-size: var(--fs-sm);
   }
 
   .add-column {
     min-width: 130px;
+    justify-content: center;
     padding: var(--space-3);
     border: 1px dashed var(--line);
     border-radius: var(--r-md);
