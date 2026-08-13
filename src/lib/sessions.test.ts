@@ -135,6 +135,34 @@ describe('스트리밍 이벤트 처리', () => {
     expect(s.usage?.outputTokens).toBe(7)
   })
 
+  /**
+   * 비용 비교가 이 앱의 차별점인데, 전송할 때 usage 를 지우면 비교를 시작하는
+   * 순간 직전 결과가 모든 칸에서 사라진다. 새 응답의 done 이 덮어쓸 때까지는
+   * 남아 있어야 한다.
+   */
+  it('새 질문을 보내도 직전 응답의 비용이 남는다', async () => {
+    const store = await freshStore()
+    const s = store.sessions[0]
+
+    emit({
+      kind: 'done',
+      sessionId: s.id,
+      usage: { inputTokens: 3, outputTokens: 7, costUsd: 0.0012, remainingFree: 19 },
+    })
+    expect(s.usage?.costUsd).toBe(0.0012)
+
+    await store.send(s, '다음 질문')
+    expect(s.usage?.costUsd).toBe(0.0012)
+
+    // 새 응답이 오면 그때 갱신된다.
+    emit({
+      kind: 'done',
+      sessionId: s.id,
+      usage: { inputTokens: 5, outputTokens: 9, costUsd: 0.0034, remainingFree: 18 },
+    })
+    expect(s.usage?.costUsd).toBe(0.0034)
+  })
+
   /** 그리드의 핵심 전제 — 한 세션의 이벤트가 다른 칸을 오염시키면 안 된다. */
   it('이벤트는 세션 ID 로만 라우팅된다', async () => {
     const store = await freshStore()

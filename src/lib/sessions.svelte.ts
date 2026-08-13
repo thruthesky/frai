@@ -149,7 +149,13 @@ export class SessionStore {
     if (!prompt || session.streaming) return
 
     session.error = null
-    session.usage = null
+    // ⚠️ 여기서 usage 를 지우지 않는다.
+    // 이 앱의 핵심 사용 흐름은 같은 질문을 여러 AI 에 동시에 던지고 답과 비용을
+    // 나란히 비교하는 것이다(broadcast). 전송할 때 usage 를 null 로 되돌리면
+    // 비교를 시작하는 바로 그 순간 직전 결과가 모든 칸에서 동시에 사라진다.
+    // 새 응답이 오면 done 이벤트가 어차피 덮어쓰므로, 그때까지는 직전 값을 남긴다.
+    // 다만 그 값은 이미 지난 응답의 것이므로 스트리밍 중에는 흐리게 보여준다
+    // (SessionCard 의 .usage.stale).
     session.messages.push({ role: 'user', content: prompt, done: true })
 
     try {

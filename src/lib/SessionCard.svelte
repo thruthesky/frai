@@ -162,7 +162,9 @@
   </footer>
 
   {#if session.usage}
-    <div class="usage">
+    <!-- 스트리밍 중이면 이 숫자는 직전 응답의 것이다. 지우지 않고 흐리게 둔다 —
+         지우면 여러 칸을 비교하던 중에 값이 한꺼번에 사라진다. -->
+    <div class="usage" class:stale={session.streaming}>
       {#if session.usage.remainingFree !== null}
         <span>오늘 남은 무료 {session.usage.remainingFree}회</span>
       {/if}
@@ -377,5 +379,9 @@
     font-size: var(--fs-xs);
     color: var(--muted);
     border-top: 1px solid var(--line);
+    transition: opacity var(--dur) var(--ease);
+  }
+  .usage.stale {
+    opacity: 0.45;
   }
 </style>

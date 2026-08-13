@@ -18,6 +18,18 @@
   const selectedCount = $derived(store.sessions.filter((s) => s.selected).length)
   const anyStreaming = $derived(store.sessions.some((s) => s.streaming))
 
+  /**
+   * 지금 각 칸에 **표시 중인** 비용의 합. 세션·기간 누적이 아니다 — 누적은 필드와
+   * 저장소가 있어야 하므로 SQLite 도입(로드맵 6) 때 다룬다. 그래서 라벨도
+   * "누적"이 아니라 "표시된 합"이라고 쓴다.
+   *
+   * remainingFree 는 더하지 않는다. 세션들이 공유하는 하나의 일일 쿼터라
+   * 합산하면 남은 횟수가 세션 수만큼 부풀려진다.
+   */
+  const shownCost = $derived(
+    store.sessions.reduce((sum, session) => sum + (session.usage?.costUsd ?? 0), 0),
+  )
+
   $effect(() => {
     void store.init()
   })
@@ -124,6 +136,10 @@
     <span>{store.sessions.length}개 세션</span>
     <span>·</span>
     <span>{selectedCount}개 선택됨</span>
+    {#if shownCost > 0}
+      <span>·</span>
+      <span>표시된 비용 합 ${shownCost.toFixed(4)}</span>
+    {/if}
     {#if anyStreaming}
       <span>·</span>
       <span class="live">응답 받는 중…</span>
