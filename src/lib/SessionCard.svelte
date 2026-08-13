@@ -21,6 +21,8 @@
   let input = $state('')
   let scroller = $state<HTMLDivElement | null>(null)
   let box = $state<HTMLTextAreaElement | null>(null)
+  /** :focus-within 을 쓰지 않는 이유: 전송 버튼을 눌러도 틀 전체가 켜져 산만하다. */
+  let inputFocused = $state(false)
 
   const provider = $derived(store.provider(session.providerId))
   const canRemove = $derived(store.sessions.length > 1)
@@ -194,19 +196,30 @@
     {/if}
   </div>
 
+  <!-- 입력칸과 전송 버튼을 하나의 틀로 묶는다. 둘이 따로 놓인 사각형이면 폼처럼
+       보이고, 묶으면 대화창으로 읽힌다. 포커스 링도 이 틀 하나에만 걸린다. -->
   <footer>
-    <textarea
-      bind:this={box}
-      bind:value={input}
-      onkeydown={onKeydown}
-      rows="2"
-      placeholder="메시지 입력 (Enter 전송 · Shift+Enter 줄바꿈)"
-      disabled={session.streaming}
-    ></textarea>
-    <button onclick={submit} disabled={session.streaming || !input.trim()} aria-label="보내기">
-      <Icon name="send" size={14} />
-      <span class="btn-label">보내기</span>
-    </button>
+    <div class="composer" class:focused={inputFocused}>
+      <textarea
+        bind:this={box}
+        bind:value={input}
+        onkeydown={onKeydown}
+        onfocus={() => (inputFocused = true)}
+        onblur={() => (inputFocused = false)}
+        rows="1"
+        placeholder="메시지 입력 (Enter 전송 · Shift+Enter 줄바꿈)"
+        disabled={session.streaming}
+      ></textarea>
+      <button
+        class="submit"
+        class:primary={!!input.trim() && !session.streaming}
+        onclick={submit}
+        disabled={session.streaming || !input.trim()}
+        aria-label="보내기"
+      >
+        <Icon name="send" size={14} />
+      </button>
+    </div>
   </footer>
 
   {#if session.usage}
@@ -233,23 +246,34 @@
     min-height: 0;
     background: var(--surface-1);
     border: 1px solid var(--line);
-    border-radius: var(--r-md);
+    border-radius: var(--r-lg);
     /* 테두리만으로 나누면 표처럼 보인다. 얕은 그림자가 카드를 배경에서 띄운다. */
     box-shadow: var(--shadow-1);
     /* ⚠️ 이 overflow 를 풀지 말 것. 헤더 배경과 메시지 스크롤 콘텐츠의 모서리
        클리핑을 이것 하나가 담당한다. 드롭다운 패널은 카드 밖으로 나가야 하므로
        잘리지 않게 position:fixed 로 띄운다(Select.svelte). */
     overflow: hidden;
-    transition: border-color var(--dur) var(--ease);
+    transition:
+      border-color var(--dur) var(--ease),
+      box-shadow var(--dur) var(--ease),
+      opacity var(--dur) var(--ease);
+  }
+  /* 커서가 올라간 칸이 한 단 떠오른다. 칸이 여럿일 때 "지금 다루는 것" 이
+     어느 것인지 알려주는 신호이며, 정적인 격자에 생기를 준다. */
+  .card:hover {
+    box-shadow: var(--shadow-2);
   }
   .card.busy {
-    border-color: var(--accent);
+    border-color: var(--accent-strong);
   }
   /* 선택된 것을 강조하는 대신 선택 안 된 것을 물러나게 한다. 기본값이 "전부 선택"
      이라(sessions.svelte.ts 의 selected = true) 강조 방식을 쓰면 첫 화면이 통째로
      accent 덩어리가 된다. */
   .card:not(.chosen) {
-    opacity: 0.78;
+    opacity: 0.62;
+  }
+  .card:not(.chosen):hover {
+    opacity: 0.85;
   }
 
   .pick {
@@ -286,13 +310,14 @@
     background: var(--surface-2);
   }
 
+  /* 헤더에 별도 배경을 깔지 않는다. 카드마다 색 띠가 하나씩 생기면 격자 전체가
+     표처럼 보인다. 경계선 한 줄로 충분하다. */
   header {
     display: flex;
     align-items: center;
     gap: var(--space-2);
     padding: var(--space-2) var(--space-3);
     border-bottom: 1px solid var(--line);
-    background: var(--surface-2);
   }
   .spacer {
     flex: 1;
@@ -347,19 +372,24 @@
     display: block;
     font-size: var(--fs-xs);
     font-weight: var(--fw-medium);
+    /* 말한 주체는 훑어볼 때만 필요한 정보다. 본문보다 확실히 뒤로 물린다. */
     color: var(--muted);
+    letter-spacing: 0.02em;
     margin-bottom: var(--space-1);
   }
   .msg .body {
     white-space: pre-wrap;
     word-break: break-word;
     font-size: var(--fs-md);
-    line-height: 1.55;
+    line-height: 1.65;
   }
+  /* 내가 쓴 말만 버블로 감싼다. 양쪽 다 버블이면 긴 답변이 색 덩어리가 되어
+     읽기 어렵다 — 답변은 카드 배경 위의 본문으로 둔다. */
   .msg.user .body {
-    background: var(--surface-3);
+    background: var(--accent-bg);
+    color: var(--fg);
     padding: var(--space-2) var(--space-3);
-    border-radius: var(--r-sm);
+    border-radius: var(--r-md);
   }
 
   .caret {
@@ -391,20 +421,20 @@
     text-align: center;
     max-width: 340px;
   }
-  /* 헤더 배지와 같은 색을 쓴다 — 이 칸이 어떤 경로인지(서버 경유/로컬)를 두 곳이
-     같은 색으로 가리켜야 같은 사실로 읽힌다. */
+  /* 아이콘 색은 헤더 배지와 맞추되(같은 사실을 같은 색으로), 원 배경은 중성으로
+     둔다. 색 원을 칸마다 하나씩 채워 넣었더니 빈 화면에서 그 원 넷이 가장 강한
+     요소가 되어, 보조 정보인 경로 표시가 위계를 뒤집었다. */
   .empty-mark {
     display: grid;
     place-items: center;
-    width: 40px;
-    height: 40px;
+    width: 38px;
+    height: 38px;
     border-radius: var(--r-full);
-    background: var(--ok-bg);
+    background: var(--surface-3);
     color: var(--ok);
     margin-block-end: var(--space-3);
   }
   .empty-mark.relay {
-    background: var(--warn-bg);
     color: var(--warn);
   }
   .empty-hint {
@@ -446,25 +476,51 @@
   }
 
   footer {
+    padding: var(--space-3);
+  }
+  .composer {
     display: flex;
+    align-items: flex-end;
     gap: var(--space-2);
     padding: var(--space-2);
-    border-top: 1px solid var(--line);
+    background: var(--surface-3);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    transition:
+      border-color var(--dur) var(--ease),
+      box-shadow var(--dur) var(--ease);
+  }
+  .composer.focused {
+    border-color: var(--accent-strong);
+    box-shadow: var(--shadow-focus);
   }
   textarea {
     flex: 1;
+    min-width: 0;
     resize: none;
-    background: var(--surface-3);
+    background: transparent;
     color: var(--fg);
-    border: 1px solid var(--line);
-    border-radius: var(--r-sm);
-    padding: var(--space-2) var(--space-2);
+    border: none;
+    padding: 0;
     font: inherit;
     font-size: var(--fs-md);
-    transition: border-color var(--dur) var(--ease);
+    line-height: 1.5;
   }
+  /* 포커스 링은 .composer 틀이 담당한다. 안쪽 textarea 에도 걸리면 링이 두 겹 생긴다. */
+  textarea:focus,
   textarea:focus-visible {
-    border-color: var(--accent);
+    outline: none;
+  }
+  textarea::placeholder {
+    color: var(--muted);
+  }
+  .submit {
+    flex: none;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    justify-content: center;
+    border-radius: var(--r-sm);
   }
 
   .usage {

@@ -9,33 +9,38 @@
    되어 배지 배경이 투명해진다. 알파가 필요하면 rgb(R G B / A) 고정값으로 적는다. */
 :root {
   /* 표면 램프 — 청계열 hue 를 유지하되 레이어 간 명도차를 넓혔다.
-     이전 값(#16181d → #1c1f26 → #21242c)은 채널당 차이가 5~9 뿐이라
-     카드·헤더·입력이 한 덩어리 회색으로 뭉쳐 보였다. */
-  --bg: #0d0f14;
-  --surface-1: #161a21; /* 카드 */
-  --surface-2: #1f242e; /* 카드 헤더 · 크롬 */
-  --surface-3: #2a303c; /* 입력 · 칩 */
-  --line: #333a47;
-  --line-strong: #434b5a;
+     한 덩어리 회색으로 뭉치면 "층"이 사라져 화면이 평평해진다. */
+  --bg: #0a0c11; /* 창 바탕 (카드 뒤) */
+  --surface-1: #14171f; /* 카드 */
+  --surface-2: #1a1e28; /* 크롬 · 카드 헤더 */
+  --surface-3: #232936; /* 입력 · 칩 */
+  --line: #2b313e;
+  --line-strong: #3c4454;
 
-  --fg: #e6e8ec;
-  --muted: #8b93a1;
-  --accent: #6ea8fe;
-  /* accent 를 배경으로 깔았을 때의 글자색. 다크의 accent 는 밝은 파랑이라
-     검은 계열이, 라이트의 accent 는 짙은 파랑이라 흰색이 읽힌다. */
-  --on-accent: #0d0f14;
+  --fg: #e8eaef;
+  --muted: #8b93a3;
+
+  /* 액센트는 인디고 계열이다. getpes.com/frai 랜딩의 FRAI 마크가
+     linear-gradient(135deg, #6366f1, #8b5cf6) 이므로 앱도 같은 색을 쓴다 —
+     받은 곳과 실행한 앱의 색이 다르면 같은 제품으로 읽히지 않는다. */
+  --accent: #8b93f8;
+  --accent-strong: #6366f1;
+  --brand-grad: linear-gradient(135deg, #6366f1, #8b5cf6);
+  /* accent 를 배경으로 깔았을 때의 글자색. 인디고는 어두워 양쪽 모드 모두 흰색이다. */
+  --on-accent: #ffffff;
+
   --ok: #4ec9a5;
   --warn: #e0a458;
   --danger: #ef6f6f;
 
   /* 상태 배경 — color-mix 대신 고정 알파 */
-  --ok-bg: rgb(78 201 165 / 0.2);
-  --warn-bg: rgb(224 164 88 / 0.22);
-  --danger-bg: rgb(239 111 111 / 0.12);
-  --accent-bg: rgb(110 168 254 / 0.2);
+  --ok-bg: rgb(78 201 165 / 0.16);
+  --warn-bg: rgb(224 164 88 / 0.18);
+  --danger-bg: rgb(239 111 111 / 0.14);
+  --accent-bg: rgb(139 147 248 / 0.16);
   /* 칸반 드롭 대상 강조. 알파가 아니라 불투명 색이어야 한다 —
      원래 값이 accent 7% 를 카드 배경과 섞은 것이라 투명도가 아니었다. */
-  --panel-hover: #1c2430;
+  --panel-hover: #1d2331;
 
   /* 레거시 별칭. 컴포넌트를 점진 이관하는 동안 유지한다 —
      한 번에 전부 rename 하면 되돌리기가 어렵다. */
@@ -50,7 +55,9 @@
   --space-5: 24px;
   --space-6: 32px;
 
-  --r-sm: 6px;
+  /* 라운드가 작으면 사무용 표처럼 보인다. 카드(--r-lg)와 컨트롤(--r-md)의
+     차이를 두어 "무엇이 담는 것이고 무엇이 담기는 것인지" 를 형태로 구분한다. */
+  --r-sm: 7px;
   --r-md: 10px;
   --r-lg: 14px;
   --r-full: 999px;
@@ -59,26 +66,35 @@
   --fs-sm: 12px;
   --fs-md: 13px;
   --fs-base: 14px;
+  --fs-lg: 16px;
   /* 위계는 크기만이 아니라 굵기·색으로도 만든다. */
   --fw-medium: 550;
   --fw-bold: 680;
 
-  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.28);
+  /* 카드가 배경에서 떠 보이려면 그림자만으로는 부족하다. 아주 옅은 윤곽선 한 겹을
+     같이 깔아 어두운 배경에서도 경계가 살아 있게 한다. */
+  --shadow-1:
+    0 1px 2px rgb(0 0 0 / 0.4),
+    0 0 0 1px rgb(255 255 255 / 0.04);
   --shadow-2:
-    0 4px 12px rgb(0 0 0 / 0.32),
-    0 1px 2px rgb(0 0 0 / 0.2);
-  --shadow-focus: 0 0 0 3px rgb(110 168 254 / 0.3);
+    0 10px 30px rgb(0 0 0 / 0.5),
+    0 2px 6px rgb(0 0 0 / 0.3),
+    0 0 0 1px rgb(255 255 255 / 0.05);
+  --shadow-focus: 0 0 0 3px rgb(99 102 241 / 0.35);
 
   --ease: cubic-bezier(0.2, 0, 0, 1);
   --dur: 140ms;
 
-  /* 크롬 높이. main 의 높이 계산이 이 값을 참조한다. */
-  --titlebar-h: 38px;
+  /* 크롬 높이. 44px 은 신호등 버튼(12px)과 컨트롤(28px)이 함께 앉는 최소치다. */
+  --titlebar-h: 44px;
 
   color-scheme: dark;
   font-family:
     -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Pretendard', system-ui, sans-serif;
   font-size: var(--fs-base);
+  /* macOS 네이티브 앱의 글자 렌더링에 맞춘다. 이것이 없으면 같은 폰트인데도
+     웹페이지처럼 굵고 뭉툭하게 보인다. */
+  -webkit-font-smoothing: antialiased;
   color: var(--fg);
   background: var(--bg);
 }
@@ -88,36 +104,41 @@
     /* 배경과 카드가 둘 다 거의 흰색이면 카드가 배경에서 떨어져 보이지 않아
        화면이 평평해진다(실측: #eceef2 위의 #ffffff 는 경계가 거의 안 보였다).
        macOS 처럼 창 바탕을 한 단 더 내려 카드가 떠 보이게 한다. */
-    --bg: #e3e6ec;
+    --bg: #e7e9f0;
     --surface-1: #ffffff;
-    --surface-2: #f4f6f9;
-    --surface-3: #e8ecf2;
-    --line: #d3d9e2;
-    --line-strong: #bcc4d0;
+    --surface-2: #f5f6fa;
+    --surface-3: #eceef4;
+    --line: #dcdfe8;
+    --line-strong: #c3c8d4;
 
-    --fg: #1a1d23;
-    --muted: #6b7280;
-    --accent: #2f6fd0;
+    --fg: #171a21;
+    --muted: #6a7080;
+
+    --accent: #5b5bd6;
+    --accent-strong: #4f46e5;
     --on-accent: #ffffff;
-    --ok: #1f9d76;
-    --warn: #b5711a;
+
+    --ok: #0f9376;
+    --warn: #a96a12;
     --danger: #c53a3a;
 
-    --ok-bg: rgb(31 157 118 / 0.14);
-    --warn-bg: rgb(181 113 26 / 0.15);
-    --danger-bg: rgb(197 58 58 / 0.12);
-    --accent-bg: rgb(47 111 208 / 0.14);
-    --panel-hover: #f0f5fc;
+    --ok-bg: rgb(15 147 118 / 0.12);
+    --warn-bg: rgb(169 106 18 / 0.13);
+    --danger-bg: rgb(197 58 58 / 0.1);
+    --accent-bg: rgb(91 91 214 / 0.12);
+    --panel-hover: #f1f2fd;
 
-    /* 다크의 짙은 그림자를 라이트에 그대로 쓰면 탁해진다. 다만 0.07 한 겹은 너무
-       옅어 카드가 배경에 붙어 보였다 — 얇은 윤곽선 역할의 한 겹을 더 깐다. */
+    /* 다크의 짙은 그림자를 라이트에 그대로 쓰면 탁해진다. 대신 겹을 나눠
+       윤곽 + 확산으로 층을 만든다. */
     --shadow-1:
-      0 1px 2px rgb(15 23 42 / 0.08),
-      0 0 0 1px rgb(15 23 42 / 0.03);
+      0 1px 2px rgb(16 24 40 / 0.06),
+      0 1px 3px rgb(16 24 40 / 0.08),
+      0 0 0 1px rgb(16 24 40 / 0.04);
     --shadow-2:
-      0 6px 16px rgb(15 23 42 / 0.1),
-      0 1px 2px rgb(15 23 42 / 0.06);
-    --shadow-focus: 0 0 0 3px rgb(47 111 208 / 0.28);
+      0 12px 32px rgb(16 24 40 / 0.12),
+      0 4px 8px rgb(16 24 40 / 0.06),
+      0 0 0 1px rgb(16 24 40 / 0.05);
+    --shadow-focus: 0 0 0 3px rgb(91 91 214 / 0.25);
 
     color-scheme: light;
   }
@@ -169,10 +190,11 @@ button {
   background: var(--surface-3);
   color: var(--fg);
   border: 1px solid var(--line);
-  border-radius: var(--r-sm);
-  padding: var(--space-2) var(--space-3);
+  border-radius: var(--r-md);
+  padding: 6px var(--space-3);
   font: inherit;
   font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
   cursor: pointer;
   /* 색만 전환한다. height·padding 에 transition 을 걸면 스트리밍으로 내용이
      늘어날 때 레이아웃 전체가 애니메이션된다. */
@@ -186,17 +208,32 @@ button:hover:not(:disabled) {
   background: var(--surface-2);
 }
 button:disabled {
-  opacity: 0.45;
+  opacity: 0.42;
   cursor: default;
 }
 button.ghost {
   background: transparent;
   border-color: transparent;
   padding: var(--space-1) var(--space-2);
+  color: var(--muted);
 }
 button.ghost:hover:not(:disabled) {
   background: var(--surface-3);
   border-color: transparent;
+  color: var(--fg);
+}
+/* 주 동작(전송). 화면에 하나뿐인 채워진 버튼이라 어디를 눌러야 하는지가 분명해진다.
+   ⚠️ :not(:disabled) 를 뺄 수 없다 — 보낼 내용이 없어 꺼져 있는 버튼까지 액센트로
+   칠하면 화면에서 가장 눈에 띄는 것이 "지금 누를 수 없는 버튼" 이 된다. */
+button.primary:not(:disabled) {
+  background: var(--accent-strong);
+  border-color: transparent;
+  color: var(--on-accent);
+}
+button.primary:hover:not(:disabled) {
+  background: var(--accent-strong);
+  border-color: transparent;
+  filter: brightness(1.08);
 }
 
 input:focus-visible,

@@ -50,6 +50,9 @@
 
 <!-- 타이틀바를 투명 처리했으므로 신호등 버튼 자리를 비워 두고 이 영역을 드래그 핸들로 쓴다. -->
 <div class="titlebar" data-tauri-drag-region>
+  <!-- 마크는 랜딩(getpes.com/frai)의 그라디언트와 같은 색이다. 받은 곳과 실행한
+       앱이 같은 제품으로 읽히려면 이 색이 어긋나면 안 된다. -->
+  <span class="mark" aria-hidden="true">F</span>
   <span class="brand">FRAI</span>
   <span class="tagline">여러 인공지능을 한 화면에서</span>
 
@@ -105,7 +108,11 @@
           placeholder={`선택한 ${selectedCount}개 세션에 같은 질문 보내기`}
           disabled={selectedCount === 0}
         />
-        <button onclick={sendAll} disabled={!broadcast.trim() || selectedCount === 0}>
+        <button
+          class="primary"
+          onclick={sendAll}
+          disabled={!broadcast.trim() || selectedCount === 0}
+        >
           <Icon name="send" size={14} />
           전체 전송
         </button>
@@ -152,16 +159,31 @@
     height: var(--titlebar-h);
     display: flex;
     align-items: center;
-    gap: var(--space-3);
+    gap: var(--space-2);
     /* 왼쪽 신호등 버튼과 겹치지 않도록 비워 둔다. */
     padding-inline-start: 84px;
     padding-inline-end: var(--space-3);
     background: var(--surface-2);
+    border-bottom: 1px solid var(--line);
     user-select: none;
+  }
+  .mark {
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    background: var(--brand-grad);
+    color: #fff;
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-bold);
+    /* 그라디언트 위의 글자가 배경에 묻지 않게 한 겹 띄운다. */
+    text-shadow: 0 1px 1px rgb(0 0 0 / 0.25);
   }
   .brand {
     font-weight: var(--fw-bold);
     letter-spacing: 0.04em;
+    margin-inline-end: var(--space-1);
   }
   .tagline {
     font-size: var(--fs-sm);
@@ -172,22 +194,24 @@
     display: flex;
     gap: 2px;
     background: var(--surface-3);
-    border-radius: var(--r-sm);
-    padding: 2px;
+    border-radius: var(--r-md);
+    padding: 3px;
   }
   .viewswitch button {
     border: none;
     background: transparent;
+    color: var(--muted);
     font-size: var(--fs-sm);
     padding: var(--space-1) var(--space-3);
-    border-radius: var(--r-sm);
+    border-radius: 7px;
   }
   .viewswitch button:hover:not(:disabled) {
     background: var(--surface-2);
+    color: var(--fg);
   }
   .viewswitch button.on {
     background: var(--surface-1);
-    color: var(--accent);
+    color: var(--fg);
     font-weight: var(--fw-medium);
     box-shadow: var(--shadow-1);
   }
@@ -247,25 +271,35 @@
     color: var(--muted);
   }
 
+  /* 한 번 입력해 여러 AI 에 동시에 보내는 것이 이 앱의 핵심 동작이다. 구석의
+     보조 입력처럼 보이면 그 가치가 화면에 드러나지 않는다 — 툴바에서 가장 큰
+     요소로 두고, 채워진 전송 버튼을 붙여 어디를 눌러야 하는지 분명히 한다. */
   .broadcast {
     display: flex;
     gap: var(--space-2);
     flex: 1;
-    max-width: 560px;
+    max-width: 720px;
   }
   .broadcast input {
     flex: 1;
-    background: var(--surface-3);
+    background: var(--surface-1);
     color: var(--fg);
     border: 1px solid var(--line);
-    border-radius: var(--r-sm);
-    padding: var(--space-2) var(--space-3);
+    border-radius: var(--r-md);
+    padding: 7px var(--space-3);
     font: inherit;
     font-size: var(--fs-md);
-    transition: border-color var(--dur) var(--ease);
+    transition:
+      border-color var(--dur) var(--ease),
+      box-shadow var(--dur) var(--ease);
   }
-  .broadcast input:focus-visible {
-    border-color: var(--accent);
+  .broadcast input::placeholder {
+    color: var(--muted);
+  }
+  .broadcast input:focus {
+    outline: none;
+    border-color: var(--accent-strong);
+    box-shadow: var(--shadow-focus);
   }
 
   /* ⚠️ minmax(0, 1fr) 을 1fr 로 줄이지 말 것. 그리드 아이템의 기본 min-width:auto 가
