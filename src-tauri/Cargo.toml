@@ -1,0 +1,36 @@
+[package]
+name = "frai"
+version = "0.1.0"
+description = "여러 인공지능 세션을 한 화면에서 동시에 다루는 macOS 데스크톱 도구"
+authors = ["JAEHO SONG"]
+license = ""
+repository = "https://github.com/thruthesky/frai"
+edition = "2021"
+rust-version = "1.77.2"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+name = "frai_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.6.3", features = [] }
+
+[dependencies]
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+log = "0.4"
+tauri = { version = "2.11.3", features = [] }
+tauri-plugin-log = "2"
+tokio = { version = "1.53.1", features = ["rt-multi-thread", "process", "io-util", "sync", "macros"] }
+async-trait = "0.1.92"
+uuid = { version = "1.20.0", features = ["v4"] }
+reqwest = { version = "0.13.3", default-features = false, features = ["rustls", "stream", "json"] }
+futures-util = { version = "0.3.34", default-features = false, features = ["std"] }
+keyring = { version = "3.6.3", features = ["apple-native"] }
+sha2 = "0.10.9"
+base64 = "0.23.1"
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-updater = "2"

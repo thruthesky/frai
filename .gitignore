@@ -1,0 +1,51 @@
+# ───────────────────────────────────────────────
+# 비밀값 — 절대 커밋 금지
+# Apple Team ID, minisign 비밀키, API 키 등 모든 비밀값은 keys/ 에 둔다.
+# ───────────────────────────────────────────────
+keys/*
+!keys/.gitkeep
+*.key
+*.p12
+*.pem
+*.mobileprovision
+.env
+.env.*
+!.env.example
+
+# ───────────────────────────────────────────────
+# Node / Vite
+# ───────────────────────────────────────────────
+node_modules
+dist
+dist-ssr
+*.local
+
+# 릴리스 산출물 모음 (DMG·app.tar.gz — 수 MB 이상). R2 로 업로드하며 저장소에 넣지 않는다.
+dist-release/
+
+# 로그
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ───────────────────────────────────────────────
+# Rust / Tauri
+# ───────────────────────────────────────────────
+src-tauri/target/
+src-tauri/gen/
+
+# ───────────────────────────────────────────────
+# 에디터 / macOS
+# ───────────────────────────────────────────────
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

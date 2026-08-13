@@ -1,0 +1,82 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "Frai",
+  "version": "0.1.0",
+  "identifier": "com.getpes.frai",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "FRAI",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 800,
+        "minHeight": 600,
+        "resizable": true,
+        "fullscreen": false,
+        "titleBarStyle": "Transparent",
+        "hiddenTitle": true
+      }
+    ],
+    "security": {
+      "csp": {
+        "default-src": "'self'",
+        "script-src": "'self'",
+        "style-src": ["'self'", "'unsafe-inline'"],
+        "img-src": ["'self'", "data:", "blob:"],
+        "font-src": ["'self'", "data:"],
+        "connect-src": ["'self'", "ipc:", "http://ipc.localhost"],
+        "object-src": "'none'",
+        "base-uri": "'self'",
+        "frame-ancestors": "'none'",
+        "form-action": "'none'"
+      },
+      "devCsp": {
+        "default-src": "'self'",
+        "script-src": ["'self'", "'unsafe-inline'"],
+        "style-src": ["'self'", "'unsafe-inline'"],
+        "img-src": ["'self'", "data:", "blob:"],
+        "font-src": ["'self'", "data:"],
+        "connect-src": [
+          "'self'",
+          "ipc:",
+          "http://ipc.localhost",
+          "ws://localhost:1421",
+          "http://localhost:1420"
+        ],
+        "object-src": "'none'",
+        "base-uri": "'self'",
+        "frame-ancestors": "'none'"
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["app", "dmg"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns"
+    ],
+    "copyright": "Copyright © 2026 FRAI",
+    "category": "DeveloperTool",
+    "shortDescription": "여러 AI 를 한 화면에서",
+    "longDescription": "FRAI 는 여러 인공지능 세션을 바둑판 형태로 펼쳐 놓고 동시에 작업하는 macOS 데스크톱 도구입니다. API 키·로컬 LLM·설치된 CLI 를 모두 활용해 최소 비용으로 인공지능을 사용합니다.",
+    "createUpdaterArtifacts": true,
+    "macOS": {
+      "minimumSystemVersion": "11.0"
+    }
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": ["https://dl.getpes.com/frai/latest.json"],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEJCRjgwMzVFOTJDM0YwRjgKUldUNDhNT1NYZ1A0dTZ2TzFUWU11cDBWSlNDbWxaMzI4N1VBK0hqUWh1UTJvMTlXV3kxTkczK2YK"
+    }
+  }
+}

@@ -1,0 +1,94 @@
+/* 색은 전부 토큰으로 정의한다. 라이트/다크 양쪽을 지원하되 기본은 다크다. */
+:root {
+  --bg: #16181d;
+  --panel: #1c1f26;
+  --panel-head: #21242c;
+  --input: #262a33;
+  --line: #30353f;
+  --fg: #e6e8ec;
+  --muted: #8b93a1;
+  --accent: #6ea8fe;
+  --ok: #4ec9a5;
+  --warn: #e0a458;
+  --danger: #ef6f6f;
+
+  color-scheme: dark;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Pretendard', system-ui, sans-serif;
+  font-size: 14px;
+  color: var(--fg);
+  background: var(--bg);
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f6f7f9;
+    --panel: #ffffff;
+    --panel-head: #f0f2f5;
+    --input: #f2f4f7;
+    --line: #dde1e7;
+    --fg: #1a1d23;
+    --muted: #6b7280;
+    --accent: #2f6fd0;
+    --ok: #1f9d76;
+    --warn: #b5711a;
+    --danger: #c53a3a;
+
+    color-scheme: light;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+button {
+  background: var(--input);
+  color: var(--fg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+button.ghost {
+  background: transparent;
+  border-color: transparent;
+  padding: 4px 7px;
+}
+button.ghost:hover {
+  background: var(--input);
+}
+
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 5px;
+}
