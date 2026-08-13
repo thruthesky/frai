@@ -274,8 +274,10 @@
     flex: 1;
     min-height: 0;
     display: grid;
-    gap: var(--space-3);
-    padding: var(--space-3);
+    /* 카드 네 장이 12px 간격이면 서로 붙어 한 덩어리로 보인다. 칸이 각각 독립된
+       대화라는 것이 간격으로 읽혀야 한다. */
+    gap: var(--space-4);
+    padding: var(--space-4);
     overflow-y: auto;
   }
   .grid[data-cols='1'] {

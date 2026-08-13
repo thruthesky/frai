@@ -5,11 +5,32 @@
 
   let { session }: { session: Session } = $props()
 
+  /**
+   * 빈 칸에 놓는 예시. 누르면 입력창에 채워진다.
+   *
+   * 라벨과 실제 프롬프트를 나눈 이유: 칸이 넷이면 같은 칩이 네 번 반복되므로
+   * 라벨은 한 줄에 들어갈 만큼 짧아야 하고, 입력창에 들어갈 문장은 그대로 보낼 수
+   * 있을 만큼 온전해야 한다.
+   */
+  const SUGGESTIONS = [
+    { label: '버그 찾기', prompt: '이 코드의 버그를 찾아줘' },
+    { label: '리팩터링', prompt: '더 간단하게 리팩터링해줘' },
+    { label: '테스트 작성', prompt: '테스트 코드를 작성해줘' },
+  ]
+
   let input = $state('')
   let scroller = $state<HTMLDivElement | null>(null)
+  let box = $state<HTMLTextAreaElement | null>(null)
 
   const provider = $derived(store.provider(session.providerId))
   const canRemove = $derived(store.sessions.length > 1)
+  /** 3열부터는 칸 너비가 300px 아래로 내려가 예시 칩이 들어가지 않는다. */
+  const narrow = $derived(store.columns >= 3)
+
+  function useSuggestion(text: string) {
+    input = text
+    box?.focus()
+  }
   /** 제목은 첫 질문에서 만들어지므로, 질문이 없으면 "새 세션 s1" 같은 소음이 된다. */
   const hasQuestion = $derived(session.messages.some((m) => m.role === 'user'))
 
@@ -136,7 +157,33 @@
     {/each}
 
     {#if session.messages.length === 0}
-      <p class="empty">질문을 입력하면 이 칸에서 대화가 시작됩니다.</p>
+      <!--
+        빈 칸이 화면의 대부분을 차지한다(4칸이면 화면의 8할). 회색 한 줄만 두면
+        앱 전체가 미완성으로 보이므로, 이 자리에 "이 칸이 어떤 AI 인지" 와
+        "무엇을 물으면 되는지" 를 넣는다.
+      -->
+      <div class="empty">
+        <span class="empty-mark" class:relay={provider?.leavesDevice}>
+          <Icon name={provider?.kind === 'cli' ? 'cpu' : 'globe'} size={20} />
+        </span>
+        <p class="empty-hint">무엇을 물어볼까요?</p>
+
+        {#if !narrow}
+          <!-- 좁은 열에서는 숨긴다. 3열 이상이면 칩이 한 줄에 들어가지 않는다. -->
+          <div class="chips">
+            {#each SUGGESTIONS as suggestion (suggestion.label)}
+              <button
+                class="chip"
+                type="button"
+                title={suggestion.prompt}
+                onclick={() => useSuggestion(suggestion.prompt)}
+              >
+                {suggestion.label}
+              </button>
+            {/each}
+          </div>
+        {/if}
+      </div>
     {/if}
 
     {#if session.error}
@@ -149,6 +196,7 @@
 
   <footer>
     <textarea
+      bind:this={box}
       bind:value={input}
       onkeydown={onKeydown}
       rows="2"
@@ -332,11 +380,58 @@
     }
   }
 
+  /* 칸이 넷이면 이 블록이 네 번 반복된다. 프로바이더 이름·설명을 여기 두면 헤더와
+     같은 말을 여덟 번 하는 셈이라, 헤더에 없는 것(다음 행동)만 남겼다. */
   .empty {
-    color: var(--muted);
-    font-size: var(--fs-sm);
     margin: auto;
+    padding: var(--space-3);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     text-align: center;
+    max-width: 340px;
+  }
+  /* 헤더 배지와 같은 색을 쓴다 — 이 칸이 어떤 경로인지(서버 경유/로컬)를 두 곳이
+     같은 색으로 가리켜야 같은 사실로 읽힌다. */
+  .empty-mark {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--r-full);
+    background: var(--ok-bg);
+    color: var(--ok);
+    margin-block-end: var(--space-3);
+  }
+  .empty-mark.relay {
+    background: var(--warn-bg);
+    color: var(--warn);
+  }
+  .empty-hint {
+    margin: 0;
+    font-size: var(--fs-sm);
+    color: var(--muted);
+  }
+
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--space-2);
+    margin-block-start: var(--space-3);
+  }
+  .chip {
+    font-size: var(--fs-sm);
+    padding: var(--space-1) var(--space-3);
+    border-radius: var(--r-full);
+    background: var(--surface-2);
+    border-color: var(--line);
+    color: var(--muted);
+  }
+  .chip:hover {
+    background: var(--panel-hover);
+    border-color: var(--line-strong);
+    color: var(--fg);
   }
   .error {
     display: flex;

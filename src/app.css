@@ -85,12 +85,15 @@
 
 @media (prefers-color-scheme: light) {
   :root {
-    --bg: #eceef2;
+    /* 배경과 카드가 둘 다 거의 흰색이면 카드가 배경에서 떨어져 보이지 않아
+       화면이 평평해진다(실측: #eceef2 위의 #ffffff 는 경계가 거의 안 보였다).
+       macOS 처럼 창 바탕을 한 단 더 내려 카드가 떠 보이게 한다. */
+    --bg: #e3e6ec;
     --surface-1: #ffffff;
-    --surface-2: #f5f7fa;
-    --surface-3: #e9edf3;
-    --line: #d8dde5;
-    --line-strong: #c2c9d4;
+    --surface-2: #f4f6f9;
+    --surface-3: #e8ecf2;
+    --line: #d3d9e2;
+    --line-strong: #bcc4d0;
 
     --fg: #1a1d23;
     --muted: #6b7280;
@@ -106,8 +109,11 @@
     --accent-bg: rgb(47 111 208 / 0.14);
     --panel-hover: #f0f5fc;
 
-    /* 다크의 짙은 그림자를 라이트에 그대로 쓰면 탁해진다. */
-    --shadow-1: 0 1px 2px rgb(15 23 42 / 0.07);
+    /* 다크의 짙은 그림자를 라이트에 그대로 쓰면 탁해진다. 다만 0.07 한 겹은 너무
+       옅어 카드가 배경에 붙어 보였다 — 얇은 윤곽선 역할의 한 겹을 더 깐다. */
+    --shadow-1:
+      0 1px 2px rgb(15 23 42 / 0.08),
+      0 0 0 1px rgb(15 23 42 / 0.03);
     --shadow-2:
       0 6px 16px rgb(15 23 42 / 0.1),
       0 1px 2px rgb(15 23 42 / 0.06);
