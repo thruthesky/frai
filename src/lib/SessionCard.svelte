@@ -1,6 +1,7 @@
 <script lang="ts">
   import { store, type Session } from './sessions.svelte'
   import Icon from './ui/Icon.svelte'
+  import Select from './ui/Select.svelte'
 
   let { session }: { session: Session } = $props()
 
@@ -75,13 +76,14 @@
       <Icon name="check" size={12} />
     </button>
 
-    <select bind:value={session.providerId} disabled={session.streaming}>
-      {#each store.providers as p (p.id)}
-        <option value={p.id} disabled={!p.available}>
-          {p.label}{p.available ? '' : ' (없음)'}
-        </option>
-      {/each}
-    </select>
+    <div class="provider">
+      <Select
+        value={session.providerId}
+        options={store.providers}
+        disabled={session.streaming}
+        onchange={(id) => (session.providerId = id)}
+      />
+    </div>
 
     {#if provider?.leavesDevice}
       <span class="tag warn" title="이 경로는 대화 내용이 getpes.com 서버를 지납니다.">
@@ -246,14 +248,12 @@
     flex: 1;
   }
 
-  select {
-    background: var(--surface-3);
-    color: var(--fg);
-    border: 1px solid var(--line);
-    border-radius: var(--r-sm);
-    padding: var(--space-1) var(--space-2);
-    font-size: var(--fs-sm);
+  /* 헤더가 좁아지면 프로바이더 이름이 먼저 줄어들도록 한다. 배지·닫기 버튼은
+     nowrap 이라 줄지 않으므로, 유일하게 양보할 수 있는 것이 여기다. */
+  .provider {
+    min-width: 0;
     max-width: 160px;
+    flex: 1 1 auto;
   }
 
   .tag {
