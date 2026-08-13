@@ -11,8 +11,8 @@ use crate::events::EventSink;
 use crate::provider::{self, ChatRequest};
 use std::collections::HashMap;
 use std::sync::Mutex;
+use tauri::async_runtime::{self, JoinHandle};
 use tauri::AppHandle;
-use tokio::task::JoinHandle;
 
 #[derive(Default)]
 pub struct SessionManager {
@@ -33,7 +33,18 @@ impl SessionManager {
         let sink = EventSink::new(app, session_id.clone());
         let sink_for_task = sink.clone();
 
-        let handle = tokio::spawn(async move {
+        // ⚠️ `tokio::spawn` 을 쓰지 않는다 — 앱이 그 자리에서 죽는다.
+        //
+        // `send_message` 는 동기 `#[tauri::command]` 라 **호출 스레드(메인 스레드)에서
+        // 그대로** 실행된다. 그런데 Tauri 의 전역 런타임(`async_runtime::default_runtime`)
+        // 은 워커 스레드만 띄울 뿐 호출 스레드를 `enter()` 하지 않으므로, 메인 스레드의
+        // thread-local 에는 런타임이 없다. `tokio::spawn` 은 그 thread-local 만 보기 때문에
+        // "there is no reactor running" 으로 패닉하고 프로세스가 abort 된다.
+        // (배포본만의 문제가 아니다. `tauri dev` 에서도 같은 경로면 똑같이 죽는다.)
+        //
+        // `async_runtime::spawn` 은 내부에서 `let _guard = r.enter()` 를 잡은 뒤 spawn 하므로
+        // 어느 스레드에서 불러도 안전하다. 여기서 `tokio::spawn` 으로 되돌리지 말 것.
+        let handle = async_runtime::spawn(async move {
             match provider.stream(req, sink_for_task.clone()).await {
                 Ok(usage) => sink_for_task.done(usage),
                 Err(e) => sink_for_task.error(e),
@@ -57,10 +68,11 @@ impl SessionManager {
 
     /// 끝난 세션을 목록에서 치운다.
     pub fn reap_finished(&self) {
+        // Tauri 의 `JoinHandle` 에는 `is_finished()` 가 없다. 내부 tokio 핸들을 꺼내 쓴다.
         self.running
             .lock()
             .unwrap()
-            .retain(|_, h| !h.is_finished());
+            .retain(|_, h| !h.inner().is_finished());
     }
 
     pub fn cancel_all(&self) {

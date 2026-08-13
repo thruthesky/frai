@@ -149,6 +149,13 @@ export class SessionStore {
     if (!prompt || session.streaming) return
 
     session.error = null
+    // ⚠️ invoke 를 부르기 **전에** 잠근다.
+    // `streaming` 은 원래 started 이벤트에서만 켜지는데, started 는 릴레이 HTTP 가
+    // 성공한 뒤에야 나간다(relay.rs). 그 사이(네트워크 대기 구간) 위의 가드가 통과되어
+    // 같은 칸에 재전송이 들어가면, start() 가 이전 태스크를 취소하고 새 요청을 열어
+    // 서버 무료 횟수가 이중으로 차감된다. 전송을 시작한 시점에 잠그는 것이 맞다.
+    // (error·done 이 모두 streaming 을 false 로 되돌리므로 잠긴 채 남지 않는다.)
+    session.streaming = true
     // ⚠️ 여기서 usage 를 지우지 않는다.
     // 이 앱의 핵심 사용 흐름은 같은 질문을 여러 AI 에 동시에 던지고 답과 비용을
     // 나란히 비교하는 것이다(broadcast). 전송할 때 usage 를 null 로 되돌리면

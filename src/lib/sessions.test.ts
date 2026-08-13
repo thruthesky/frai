@@ -231,6 +231,27 @@ describe('메시지 전송', () => {
     expect(h.invoke.mock.calls.some(([cmd]) => cmd === 'send_message')).toBe(false)
   })
 
+  /**
+   * ⚠️ 회귀 방지 — started 이벤트가 오기 **전**에도 재전송이 막혀야 한다.
+   *
+   * started 는 릴레이 HTTP 가 성공한 뒤에야 나간다(relay.rs). 예전에는 streaming 을
+   * started 에서만 켰기 때문에, 그 사이 네트워크 대기 구간에 같은 칸으로 다시 보낼 수
+   * 있었다. 그러면 start() 가 이전 태스크를 취소하고 새 요청을 열어 서버 무료 횟수가
+   * 이중으로 차감된다. 위 테스트는 streaming 을 손으로 켜서 이 구간을 못 잡는다.
+   */
+  it('started 이벤트가 오기 전에도 재전송을 막는다', async () => {
+    const store = await freshStore()
+    const s = store.sessions[0]
+
+    await store.send(s, '첫 번째')
+    // 여기서 session-event(started) 를 일부러 보내지 않는다 — 응답 대기 중인 상태.
+    await store.send(s, '두 번째')
+
+    const sent = h.invoke.mock.calls.filter(([cmd]) => cmd === 'send_message')
+    expect(sent).toHaveLength(1)
+    expect(sent[0][1].request.messages.at(-1).content).toBe('첫 번째')
+  })
+
   /** 이 앱의 핵심 사용 흐름 — 같은 질문을 여러 AI 에 동시에 던진다. */
   it('브로드캐스트는 선택된 세션에만 보낸다', async () => {
     const store = await freshStore()
