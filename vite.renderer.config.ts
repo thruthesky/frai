@@ -1,11 +1,34 @@
 // 테스트 설정은 vitest.config.ts 에 따로 있다(root 가 달라야 하기 때문).
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 import { svelte } from '@sveltejs/vite-plugin-svelte'
+import { cspFor } from './src/shared/csp.js'
+
+/**
+ * 배포 빌드의 `index.html` 에 CSP `<meta>` 를 넣는다.
+ *
+ * ⚠️ 이것이 없으면 **배포본에는 CSP 가 전혀 없다.** main 은 `onHeadersReceived` 로
+ * CSP 를 주입하는데, 배포본은 `loadFile()`(`file://`)이라 그 훅이 걸리지 않기 때문이다.
+ * 개발 서버(http)는 헤더가 정상 동작하므로 meta 를 넣지 않는다 — HMR 연결까지
+ * 정적 문자열에 박아 두면 포트를 바꿀 때마다 깨진다.
+ */
+function cspMetaPlugin(): Plugin {
+  return {
+    name: 'frai-csp-meta',
+    transformIndexHtml: {
+      order: 'pre',
+      handler(html, ctx) {
+        if (ctx.server) return html // 개발 서버는 헤더가 담당한다
+        const meta = `<meta http-equiv="Content-Security-Policy" content="${cspFor({ dev: false })}" />`
+        return html.replace('<head>', `<head>\n    ${meta}`)
+      }
+    }
+  }
+}
 
 // https://vite.dev/config/
 export default defineConfig({
   // root 가 src/renderer 라 루트의 svelte.config.js 를 자동으로 찾지 못한다.
-  plugins: [svelte({ configFile: '../../svelte.config.js' })],
+  plugins: [svelte({ configFile: '../../svelte.config.js' }), cspMetaPlugin()],
 
   // renderer 만 담당한다. main·preload 는 각자 vite.*.config.ts 로 빌드한다.
   root: 'src/renderer',

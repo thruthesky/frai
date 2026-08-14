@@ -48,9 +48,16 @@ export class CliProvider implements Provider {
     // 대화 이어가기. CLI 가 자체 세션을 관리하므로 히스토리를 다시 보내지 않는다.
     if (req.resumeId && spec.format === 'claudeStreamJson') args.push('--resume', req.resumeId)
 
+    // ⚠️ 자식이 다시 자식을 띄우는 경우까지 고려해 PATH 를 명시적으로 물려준다.
+    const path = await userPath()
+
+    // 🛑 여기까지 오는 데 시간이 걸린다(실행 파일 탐색 + 로그인 셸 조회는 최대 10초).
+    //    그 사이에 사용자가 취소했다면 **자식을 띄우면 안 된다.** 예전에는 그대로
+    //    spawn 해서, 취소했는데도 CLI 가 백그라운드에서 살아 돌아가는 누수가 났다.
+    signal.throwIfAborted()
+
     const child = spawn(bin, args, {
-      // ⚠️ 자식이 다시 자식을 띄우는 경우까지 고려해 PATH 를 명시적으로 물려준다.
-      env: { ...process.env, PATH: await userPath() },
+      env: { ...process.env, PATH: path },
       stdio: ['pipe', 'pipe', 'pipe'],
       // POSIX: 자기 자신을 그룹 리더로 만들어 손자까지 한 번에 죽일 수 있게 한다.
       // Windows: detached 는 새 콘솔을 뜻하므로 쓰지 않고 taskkill /T 로 트리를 죽인다.
@@ -59,6 +66,8 @@ export class CliProvider implements Provider {
 
     const onAbort = () => killProcessTree(child.pid)
     signal.addEventListener('abort', onAbort, { once: true })
+    // spawn 과 리스너 등록 사이의 틈에서 취소됐다면 리스너가 못 받는다. 한 번 더 확인한다.
+    if (signal.aborted) killProcessTree(child.pid)
 
     try {
       return await run(child, spec, prompt, sink, signal)
@@ -83,6 +92,19 @@ async function run(
 
   sink.started(spec.id)
 
+  // 🛑 stdin 에 error 핸들러를 **반드시** 먼저 단다.
+  //
+  // 자식이 프롬프트를 읽기 전에 죽으면(실행 파일이 잘못됐거나 즉시 종료하는 경우)
+  // 쓰기가 EPIPE 로 실패한다. Node 에서 스트림의 처리되지 않은 `error` 는 예외로
+  // 승격되어 **main 프로세스 전체를 종료시킨다** — 그리드로 6~9개를 돌리는 앱에서
+  // CLI 하나가 즉사하면 앱이 통째로 사라진다는 뜻이다.
+  //
+  // EPIPE 는 여기서 삼킨다. 진짜 실패 원인(exit code·stderr)은 아래에서 잡히므로
+  // 사용자에게는 그쪽이 훨씬 정확한 메시지가 된다.
+  child.stdin?.on('error', (e: NodeJS.ErrnoException) => {
+    if (e.code !== 'EPIPE') console.warn(`\`${spec.bin}\` stdin 오류: ${e.message}`)
+  })
+
   // 프롬프트를 stdin 으로 넘기고 즉시 닫는다(닫지 않으면 CLI 가 입력을 기다린다).
   child.stdin?.end(prompt)
 
@@ -104,6 +126,10 @@ async function run(
     if (!child.stdout) throw new Error('자식 프로세스의 stdout 을 열 수 없습니다.')
     const rl = createInterface({ input: child.stdout, crlfDelay: Infinity })
     for await (const line of rl) {
+      // 🛑 취소된 뒤에는 한 글자도 화면으로 내보내지 않는다.
+      //    자식을 죽여도 이미 파이프에 쌓인 출력은 계속 읽히므로, 여기서 끊지 않으면
+      //    "중지를 눌렀는데 답변이 계속 늘어나는" 현상이 생긴다.
+      if (signal.aborted) break
       if (spec.format === 'claudeStreamJson') {
         const parsed = parseClaudeLine(line)
         if (parsed.kind === 'text') {

@@ -70,12 +70,20 @@ export function cliSpec(id: string): CliSpec | undefined {
 }
 
 let cachedPath: string | null = null
+/** 조회가 진행 중인 promise. 동시에 여러 세션이 불러도 셸은 한 번만 띄운다. */
+let inflightPath: Promise<string> | null = null
 
 /**
- * 사용자의 실제 PATH 를 얻는다. 프로세스 수명 동안 1회만 조회한다.
+ * 사용자의 실제 PATH 를 얻는다.
  *
  * macOS·Linux 는 로그인 셸을 거치고, Windows 는 상속된 PATH 를 그대로 쓴다.
  * 실패하면 현재 프로세스의 PATH 로 물러선다(개발 모드에서는 그걸로 충분하다).
+ *
+ * ⚠️ **성공한 값만 캐시한다.** 예전에는 실패한 fallback 도 캐시해서, 로그인 셸이
+ * 한 번이라도 삐끗하면 프로세스가 살아 있는 내내 잘못된 PATH 를 쓰고 CLI 를 영영
+ * 찾지 못했다. 실패를 캐시하지 않으면 다음 요청에서 다시 시도해 스스로 회복한다.
+ * (재시도 비용은 in-flight 공유로 억제한다 — 그리드 세션 6~9개가 동시에 불러도
+ * 셸은 한 번만 뜬다.)
  */
 export async function userPath(): Promise<string> {
   if (cachedPath !== null) return cachedPath
@@ -83,32 +91,41 @@ export async function userPath(): Promise<string> {
   const fallback = process.env.PATH ?? ''
 
   // Windows GUI 앱은 PATH 를 정상적으로 상속한다. 셸을 띄울 이유가 없다.
+  // (여기서는 상속값이 정답이므로 캐시해도 고착 문제가 없다.)
   if (isWindows) {
     cachedPath = fallback
     return cachedPath
   }
 
+  if (inflightPath !== null) return inflightPath
+
   const shell = process.env.SHELL ?? '/bin/zsh'
-  try {
-    const { stdout } = await execFileAsync(shell, ['-l', '-c', 'echo $PATH'], { timeout: 10_000 })
-    const s = stdout.trim()
-    if (s === '') {
-      console.warn('로그인 셸이 빈 PATH 를 반환했습니다. 현재 PATH 로 대체합니다.')
-      cachedPath = fallback
-    } else {
+  inflightPath = (async () => {
+    try {
+      const { stdout } = await execFileAsync(shell, ['-l', '-c', 'echo $PATH'], { timeout: 10_000 })
+      const s = stdout.trim()
+      if (s === '') {
+        console.warn('로그인 셸이 빈 PATH 를 반환했습니다. 현재 PATH 로 대체합니다(캐시하지 않음).')
+        return fallback
+      }
       console.info(`로그인 셸에서 PATH 확보: ${s.split(delimiter).length} 개 항목`)
       cachedPath = s
+      return s
+    } catch (e) {
+      console.warn(`로그인 셸(${shell}) 실행 실패: ${String(e)}. 현재 PATH 로 대체합니다(캐시하지 않음).`)
+      return fallback
+    } finally {
+      inflightPath = null
     }
-  } catch (e) {
-    console.warn(`로그인 셸(${shell}) 실행 실패: ${String(e)}. 현재 PATH 로 대체합니다.`)
-    cachedPath = fallback
-  }
-  return cachedPath
+  })()
+
+  return inflightPath
 }
 
 /** 테스트에서 PATH 캐시를 비운다. */
 export function resetPathCache(): void {
   cachedPath = null
+  inflightPath = null
 }
 
 /**

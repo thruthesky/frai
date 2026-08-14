@@ -191,18 +191,19 @@ pkill -f "ssh -f -N -L 15433:"
 
 목적이 무료·저가인 이상, 프로바이더 선택은 기능이 아니라 제품의 정체성이다. FRAI 는 **네 가지 경로**를 지원한다.
 
-### 경로 0. 기본 AI — getpes.com 릴레이 (DeepSeek v4 Flash)
+### 경로 0. 기본 AI — getpes.com 릴레이 ✅ 구현 완료
 
 아무 설정 없이 **즉시, 무료로** 쓸 수 있는 첫 경험을 제공한다. BYOK 앱의 가장 큰 진입 장벽인 "API 키 발급"을 첫 실행에서 제거하는 것이 목적이다.
 
 ```
-FRAI ──POST──> https://getpes.com/frai/api/chat ──> api.deepseek.com
-     <──SSE──                                   <──
+FRAI ──POST──> https://getpes.com/frai/api/chat ──> AKRouter (기본) · DeepSeek · 그 외
+     <──SSE──                                   <──   전부 OpenAI Chat Completions 규격
 ```
 
-- **DeepSeek API 키는 서버에만 둔다.** 앱에는 절대 내려보내지 않는다.
-- **하루 20회까지** 무료. 초과하면 개인 API 키 등록 또는 CLI 연동으로 안내한다.
-- PES 에 이미 `deepseek-v4-flash` 클라이언트와 단가표가 있다 (`~/apps/pes/web/src/lib/server/deepseek/`). 서버 구현 시 재사용한다.
+- **AI 서비스 API 키는 서버에만 둔다.** 앱에는 절대 내려보내지 않는다.
+- **익명 5회/일(기기 ID) · 로그인 20회/일(uid)** + 전역 일일 예산 상한. 초과하면 개인 API 키 등록 또는 CLI 연동으로 안내한다.
+- **두뇌는 언제든 갈아끼운다.** 표준은 **OpenAI Chat Completions 프로토콜**이므로 프로바이더 교체는 환경변수 세 개(`FRAI_LLM_PROVIDER`·모델·키)를 바꾸는 일이지 코드를 고치는 일이 아니다. 서버 구현은 `~/apps/pes/web/src/lib/server/llm/` 이며 레지스트리에 akrouter·deepseek·openai·openrouter·ollama 가 들어 있다. 레지스트리 밖은 `FRAI_LLM_BASE_URL` 로 지정한다.
+  - ⚠️ 이 규격을 못 맞추는 프로바이더(Anthropic 네이티브 `/v1/messages` 등)는 어댑터를 따로 만든다. 레지스트리에 억지로 끼워 넣지 않는다 — 그러면 "표준"이 의미를 잃는다.
 
 **⚠️ 이 경로는 두 가지 전제를 깬다. 반드시 인지하고 설계한다.**
 
@@ -239,14 +240,15 @@ FRAI ──POST──> https://getpes.com/frai/api/chat ──> api.deepseek.com
 - 로그인이 실질적인 남용 방지 장치가 된다. 익명 한도를 낮게 유지해 "재설치로 무한 리셋" 의 이득을 줄인다.
 - **서버 전역 일일 예산 상한은 별도로 반드시 둔다.** 위 두 장치가 뚫려도 비용은 막아야 한다.
 
-### 릴레이 API 규약 (FRAI ↔ getpes.com)
+### 릴레이 API 규약 (FRAI ↔ getpes.com) — ✅ 양쪽 구현 완료
 
-클라이언트(`src/main/provider/relay.ts`)는 이미 이 규약으로 구현되어 있다. 서버를 만들 때 맞춘다.
+클라이언트는 `src/main/provider/relay.ts`, 서버는 `~/apps/pes/web/src/routes/frai/api/chat/+server.ts` 다.
 
 ```
 POST /frai/api/chat
 X-Frai-Device: <익명 기기 UUID>
 X-Frai-Version: <앱 버전>
+Authorization: Bearer <FRAI 토큰>     ← 있을 때만. 로그인 쿼터(20회)를 받는다
 { "messages": [{"role":"user","content":"..."}] }
 
 ← 200 text/event-stream
@@ -255,8 +257,22 @@ data: {"type":"done","usage":{"inputTokens":1,"outputTokens":2,"costUsd":0.0001,
 data: {"type":"error","message":"..."}
 data: [DONE]
 
-← 429  일일 한도 초과 (앱이 다른 경로로 안내한다)
+← 400  messages 형식 오류 · 익명인데 기기 ID 없음
+← 401  Authorization 이 있는데 무효 (⚠️ 익명으로 강등하지 않는다)
+← 429  일일 한도 초과 · 전역 예산 소진 (앱이 다른 경로로 안내한다)
+← 503  동시 스트림 포화 · 서버 AI 설정 미완 (잠시 뒤 다시 되는 상황이라 429 를 쓰지 않는다)
 ```
+
+**서버 쪽 요점** (`web/src/lib/server/llm/` · `web/src/lib/server/frai/quota.ts`)
+
+- **시스템 프롬프트는 FRAI 전용**이다. PES 의 `SYSTEM_PROMPT`(라리아 학습 도우미)를 재사용하지 않는다 — 그쪽은 모든 답변 끝에 【음성요약】을 강제해서 코드 블록 뒤에 잡음이 붙는다.
+- **입력 상한**: 메시지 40개 · 총 32KiB · 응답 토큰 상한. 업스트림을 부르기 **전에** 막는다. `role: "system"` 은 클라이언트가 넣을 수 없다(페르소나 교체 우회 차단).
+- **쿼터는 원자적**이다 — `INSERT ... ON CONFLICT DO UPDATE ... WHERE requests < limit`. "읽고 나서 쓰기" 로 나누면 동시 요청이 둘 다 통과한다.
+- **전역 예산은 soft cap** 이다. 비용은 응답이 끝나야 알 수 있어 사전 예약이 불가능하다. 그 오버슈트를 동시 스트림 상한이 좁힌다.
+- **요청별 원장(`web.frai_relay_requests`)을 남긴다.** 집계만 남기면 "한 요청이 실제로 얼마를 쓰는가" 를 나중에 소급할 수 없다.
+- 클라이언트가 끊으면 `ReadableStream.cancel()` 에서 업스트림을 abort 한다(비용 누수 차단).
+- 검증: `cd ~/apps/pes/web && npx vitest run src/lib/server/frai src/lib/server/llm` (DB 는 원격 터널 필요, 없으면 통합분은 스킵)
+- **실서버 스모크**: `FRAI_SMOKE_URL=... npm run test` (`src/main/relay-smoke.test.ts`) — 평소엔 스킵되고, 환경변수를 주면 앱 코드가 실제 서버를 때린다.
 
 - `remainingFree` 를 매 응답에 실어 보낸다. 앱이 남은 횟수를 표시해 초과 전에 대비하게 한다.
 - 서버는 PES SvelteKit 라우트로 구현한다. SSE 스트리밍 선례: `~/apps/pes/web/src/routes/api/chat/[roomId]/messages/+server.ts`
@@ -707,7 +723,9 @@ bash scripts/make-latest-json.sh <R2_PUBLIC_BASE_URL>
      - 두 경로를 같이 붙여야 추상화가 검증된다. 한쪽만 만들고 나중에 끼워 넣으면 반드시 새는 추상화가 된다.
   3. ✅ **그리드 멀티 세션 골격** — 세션별 프로바이더 선택, 브로드캐스트 입력, 서버경유/로컬 배지
   3-1. ✅ **세션 목록 (칸반 보드)** — 네이티브 메뉴 `보기`(⌘1/⌘2), 칸 추가·이름변경·삭제, 드래그로 세션 이동
-  4. ⬜ **getpes.com 릴레이 서버 구현** (PES 저장소) — 위 "릴레이 API 규약" 대로. 익명 5회 / 로그인 20회 + 전역 예산 상한
+  4. ✅ **getpes.com 릴레이 서버 구현** (PES 저장소) — 위 "릴레이 API 규약" 대로. 익명 5회 / 로그인 20회 + 전역 예산 상한.
+       두뇌는 OpenAI Chat Completions 규격으로 추상화되어 환경변수만으로 교체된다(기본 AKRouter).
+       ⚠️ **프로덕션에 `AKROUTER_API_KEY` 를 넣어야 실제로 동작한다.**
   4-1. ✅ **PES 호환 로그인** — 앱(`auth.rs`)과 서버(PES `/frai/auth` · `/frai/api/auth/{exchange,revoke}`) 양쪽 완료.
        마이그레이션 `0019` 는 **PES 배포 시 컨테이너 기동에서 자동 적용**된다.
   4-2. ⬜ **세션 목록 동기화** — `frai_sessions` · `frai_columns` 테이블 + API. 로그인 시 로컬 목록 merge

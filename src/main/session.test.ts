@@ -85,6 +85,71 @@ describe('SessionManager', () => {
   })
 
   /**
+   * 🔒 **계약 고정** — 아래 문자열은 상상해서 쓴 것이 아니라, PES 의 릴레이 라우트
+   * (`web/src/routes/frai/api/chat/+server.ts`)를 실제로 호출해 받은 **바이트열 그대로**다.
+   *
+   * 두 저장소가 분리돼 있어 서버를 고치면서 앱을 깨뜨리기 쉽다. 서버 응답 형식이
+   * 바뀌면 이 테스트가 먼저 빨개진다. 갱신할 때는 **다시 캡처해서** 붙여 넣는다
+   * (지어내지 말 것 — 그러면 계약이 아니라 소설이 된다).
+   */
+  it('릴레이 서버가 실제로 내보낸 응답을 그대로 해석한다', async () => {
+    const url = await startSse(
+      'data: {"type":"chunk","text":"안녕하세요"}\n\n' +
+        'data: {"type":"chunk","text":"! 무엇을 도와드릴까요?"}\n\n' +
+        'data: {"type":"done","usage":{"inputTokens":11,"outputTokens":9,"costUsd":0.00000406,"remainingFree":4}}\n\n' +
+        'data: [DONE]\n\n'
+    )
+    const { mgr, events } = managerFor(url)
+    mgr.start(req(), (e) => events.push(e))
+    await settle()
+
+    expect(events.map((e) => e.kind)).toEqual(['started', 'chunk', 'chunk', 'done'])
+    const text = events.filter((e) => e.kind === 'chunk').map((e) => (e as { text: string }).text).join('')
+    expect(text).toBe('안녕하세요! 무엇을 도와드릴까요?')
+
+    const done = events.at(-1) as {
+      usage: { inputTokens: number | null; outputTokens: number | null; costUsd: number | null; remainingFree: number | null }
+    }
+    expect(done.usage).toEqual({ inputTokens: 11, outputTokens: 9, costUsd: 0.00000406, remainingFree: 4 })
+  })
+
+  /** 단가를 모르는 모델이면 서버가 `costUsd: null` 을 보낸다 — 0 으로 뭉개면 안 된다. */
+  it('비용을 모르는 응답도 null 로 정확히 받는다', async () => {
+    const url = await startSse(
+      'data: {"type":"done","usage":{"inputTokens":11,"outputTokens":2,"costUsd":null,"remainingFree":1}}\n\n' +
+        'data: [DONE]\n\n'
+    )
+    const { mgr, events } = managerFor(url)
+    mgr.start(req(), (e) => events.push(e))
+    await settle()
+
+    const done = events.at(-1) as { usage: { costUsd: number | null; remainingFree: number | null } }
+    expect(done.usage.costUsd).toBeNull()
+    expect(done.usage.remainingFree).toBe(1)
+  })
+
+  /**
+   * ⚠️ 서버가 마지막 줄을 개행 없이 끝내는 것은 정상 SSE 다. 예전에는 루프가
+   * `\n` 을 만날 때만 파싱하고 남은 버퍼를 버려서, 그 마지막 이벤트(대개 `done`)가
+   * 통째로 사라졌다 — 화면에 사용량·비용이 안 뜨는 원인이 된다.
+   */
+  it('마지막 줄이 개행 없이 끝나도 done 을 놓치지 않는다', async () => {
+    const url = await startSse(
+      'data: {"type":"chunk","text":"끝"}\n' +
+        'data: {"type":"done","usage":{"inputTokens":7,"outputTokens":1,"costUsd":0.002,"remainingFree":3}}'
+      // ← 개행 없이 끝난다
+    )
+    const { mgr, events } = managerFor(url)
+    mgr.start(req(), (e) => events.push(e))
+    await settle()
+
+    expect(events.map((e) => e.kind)).toEqual(['started', 'chunk', 'done'])
+    const done = events.at(-1) as { usage: { inputTokens: number | null; remainingFree: number | null } }
+    expect(done.usage.inputTokens).toBe(7)
+    expect(done.usage.remainingFree).toBe(3)
+  })
+
+  /**
    * ⚠️ Tauri 판에는 오류 뒤에 done 이 따라붙는 결함이 있었다(어댑터와 세션이 둘 다
    * 이벤트를 냈다). 오류 이벤트의 발신 책임자는 SessionManager 한 곳뿐이어야 한다.
    */

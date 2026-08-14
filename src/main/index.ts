@@ -13,40 +13,21 @@ import { Auth } from './auth/index.js'
 import { createSessionStore } from './auth/store.js'
 import { registerIpc } from './ipc.js'
 import { SessionManager } from './session.js'
+import { cspFor, DEV_URL as DEFAULT_DEV_URL } from '../shared/csp.js'
 import { IPC } from '../shared/types.js'
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 const isDev = !app.isPackaged
-const DEV_URL = process.env.FRAI_DEV_URL ?? 'http://localhost:1420'
+const DEV_URL = process.env.FRAI_DEV_URL ?? DEFAULT_DEV_URL
 
 /**
- * 콘텐츠 보안 정책.
+ * 릴레이(기본 AI) 엔드포인트.
  *
- * Tauri 는 `tauri.conf.json` 에 적으면 자동으로 주입해 줬지만 Electron 은 아무것도
- * 해 주지 않는다 — **여기서 직접 넣지 않으면 CSP 가 통째로 없는 앱이 된다.**
- * 이 앱은 외부(LLM)에서 온 텍스트를 화면에 그리므로, 스크립트 주입이 성공하면
- * 그 스크립트가 preload 를 통해 main 에 도달할 수 있다. 일반 웹의 XSS 보다 심각하다.
- *
- * `unsafe-inline` 은 style 에만 허용한다(Svelte 가 스타일을 인라인으로 넣는다).
- * script 에는 절대 넣지 않는다 — Svelte 를 컴파일해 쓰는 이유 중 하나가 이것이다.
+ * 기본값은 프로덕션이고, `FRAI_RELAY_URL` 로 로컬 서버를 가리킬 수 있다.
+ * **릴레이 서버를 개발할 때 이것이 없으면 앱이 항상 프로덕션을 때린다** — 서버를
+ * 고쳐도 시험할 방법이 없어진다(Tauri 판에는 있던 기능이라 이식 누락이었다).
  */
-function cspFor(dev: boolean): string {
-  const connect = dev
-    ? `'self' ${DEV_URL} ws://localhost:1421 https://getpes.com`
-    : `'self' https://getpes.com`
-  return [
-    "default-src 'self'",
-    dev ? "script-src 'self' 'unsafe-inline'" : "script-src 'self'",
-    "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob:",
-    "font-src 'self' data:",
-    `connect-src ${connect}`,
-    "object-src 'none'",
-    "base-uri 'self'",
-    "frame-ancestors 'none'",
-    "form-action 'none'"
-  ].join('; ')
-}
+const RELAY_URL = process.env.FRAI_RELAY_URL?.trim() || undefined
 
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -138,7 +119,7 @@ if (!app.requestSingleInstanceLock()) {
       callback({
         responseHeaders: {
           ...details.responseHeaders,
-          'Content-Security-Policy': [cspFor(isDev)]
+          'Content-Security-Policy': [cspFor({ dev: isDev, devUrl: DEV_URL })]
         }
       })
     })
@@ -149,10 +130,12 @@ if (!app.requestSingleInstanceLock()) {
       openExternal: (url) => shell.openExternal(url)
     })
     const sessions = new SessionManager({
+      endpoint: RELAY_URL,
       deviceIdPath: join(userData, 'device-id'),
       appVersion: app.getVersion(),
       bearer: () => auth.bearer()
     })
+    if (RELAY_URL) console.info(`릴레이 엔드포인트 재지정: ${RELAY_URL}`)
 
     registerIpc({ sessions, auth, getWindow: () => mainWindow })
 

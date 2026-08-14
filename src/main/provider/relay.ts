@@ -83,9 +83,34 @@ export class RelayProvider implements Provider {
 
     sink.started(PROVIDER_ID)
 
-    let usage = emptyUsage()
+    const usage = emptyUsage()
     const decoder = new TextDecoder()
     let buf = ''
+
+    /**
+     * 한 줄을 해석해 이벤트로 내보낸다.
+     * 스트림을 여기서 끝내야 하면 최종 사용량을 돌려주고, 계속 읽어야 하면 null.
+     */
+    const handle = (line: string): Usage | null => {
+      const ev = parseSseLine(line)
+      switch (ev.type) {
+        case 'chunk':
+          sink.chunk(ev.text)
+          return null
+        case 'done':
+          return ev.usage
+        case 'error':
+          // ⚠️ 여기서 sink.error() 를 부르지 않는다.
+          // 오류 이벤트의 발신 책임자는 SessionManager 한 곳이다. 양쪽이 모두
+          // 내보내면 error 가 두 번 가거나 error 뒤에 done 이 따라붙는다
+          // (Tauri 판에 실제로 있던 결함이다).
+          throw new Error(ev.message)
+        case 'stop':
+          return usage
+        case 'ignore':
+          return null
+      }
+    }
 
     for await (const chunk of resp.body as unknown as AsyncIterable<Uint8Array>) {
       buf += decoder.decode(chunk, { stream: true })
@@ -96,25 +121,19 @@ export class RelayProvider implements Provider {
         const line = buf.slice(0, idx).replace(/\r+$/, '')
         buf = buf.slice(idx + 1)
 
-        const ev = parseSseLine(line)
-        switch (ev.type) {
-          case 'chunk':
-            sink.chunk(ev.text)
-            break
-          case 'done':
-            return ev.usage
-          case 'error':
-            // ⚠️ 여기서 sink.error() 를 부르지 않는다.
-            // 오류 이벤트의 발신 책임자는 SessionManager 한 곳이다. 양쪽이 모두
-            // 내보내면 error 가 두 번 가거나 error 뒤에 done 이 따라붙는다
-            // (Tauri 판에 실제로 있던 결함이다).
-            throw new Error(ev.message)
-          case 'stop':
-            return usage
-          case 'ignore':
-            break
-        }
+        const finished = handle(line)
+        if (finished !== null) return finished
       }
+    }
+
+    // ⚠️ 스트림이 개행 없이 끝나면 마지막 줄이 `buf` 에 남는다. 이것을 버리면
+    // 대개 `done` 이벤트가 통째로 사라져 **사용량·비용이 표시되지 않는다.**
+    // (`decode()` 를 인자 없이 한 번 더 불러 멀티바이트 잔여분까지 비운다.)
+    buf += decoder.decode()
+    const tail = buf.replace(/\r+$/, '')
+    if (tail !== '') {
+      const finished = handle(tail)
+      if (finished !== null) return finished
     }
 
     return usage
