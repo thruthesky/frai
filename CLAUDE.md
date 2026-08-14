@@ -617,13 +617,36 @@ PES 는 이미 대용량 바이너리(모델 체크포인트)를 다루는 확�
   - 작업 후 `cd web && pnpm test` 로 번역 누락 검사를 통과시킨다.
 - **랜딩 페이지에 버전·다운로드 URL 을 하드코딩하지 않는다.** R2 의 릴리스 JSON 을 fetch 해서 표시한다. 그래야 **FRAI 새 버전 배포에 PES 재배포가 필요 없다.** (브라우저에서 fetch 하므로 R2 버킷에 CORS 설정이 필요하다.)
 
-### 자동 업데이트 — 주의할 점
+### 자동 업데이트 — ✅ 구현 완료 (electron-updater)
 
-- `tauri-plugin-updater` + 정적 JSON 매니페스트(`latest.json`)를 R2 에 둔다.
-- ⚠️ **업데이터가 받는 아티팩트는 DMG 가 아니다.** macOS 업데이터는 **`Frai.app.tar.gz` + `Frai.app.tar.gz.sig`** 를 사용한다. DMG 는 사용자가 처음 설치할 때만 쓴다. 릴리스마다 **두 종류를 모두** 올려야 한다.
-- ⚠️ **Tauri 업데이터 서명과 Apple 코드서명은 완전히 별개다.**
-  - Apple 코드서명·공증: 아래 자격증명 → `tauri build` 가 서명·공증·staple 까지 처리.
-  - Tauri 업데이터 서명: `tauri signer generate` 로 minisign 키쌍 생성. 공개키는 `tauri.conf.json` 에 넣고, **비밀키는 절대 저장소에 커밋하지 않는다.**
+`electron-updater` 의 generic provider 가 `https://dl.getpes.com/frai/` 의 채널 파일을 읽는다.
+배선은 [src/main/index.ts](src/main/index.ts), **정책은 [src/main/updater.ts](src/main/updater.ts)** 에 있다.
+
+| | |
+|---|---|
+| 업데이터 매니페스트 | `latest-mac.yml` · `latest.yml` — **electron-builder 가 자동 생성**한다 |
+| 업데이터가 받는 것 | **zip** (`electron-builder.yml` 의 mac target 에 zip 이 있는 이유). DMG 는 첫 설치용 |
+| 랜딩 매니페스트 | `latest.json` — **별도 형식**이며 `script/deploy-frai.sh` 가 만든다(`dmg.url` 을 랜딩이 읽는다) |
+| 서명 | Apple 코드서명·공증 하나뿐. **minisign 키(`keys/frai-updater.key`)는 Electron 에서 쓰지 않는다** |
+
+**정책 — 사용자가 하던 일을 빼앗지 않는다.**
+
+- 다운로드는 자동(`autoDownload`), 적용은 앱을 끌 때(`autoInstallOnAppQuit`).
+- **진행 중인 세션이 있으면 재시작을 제안하지 않는다.** 몇 분씩 걸리는 AI 작업이 통째로 날아가기
+  때문이다. 조용해진 뒤 다음 확인에서 다시 제안한다. 거절해도 손해가 없다 — 종료 시 적용된다.
+- 확인 실패(네트워크 없음·서버 일시 장애)는 **로그만 남기고 무시**한다. 업데이트가 도구 사용을
+  막으면 안 된다.
+- 개발 모드에서는 아예 확인하지 않는다(`app-update.yml` 이 없어 무조건 실패한다).
+- 시작 시 1회 + 6시간마다. 메뉴 **FRAI → 업데이트 확인…**(Windows 는 보기 메뉴)로 수동 확인도 된다.
+
+정책은 `src/main/updater.test.ts` 가 창 없이 검증한다(주입 방식이라 `electron` 을 import 하지 않는다).
+
+**⚠️ macOS 자동 업데이트는 서명·공증이 전제다.** Squirrel.Mac 이 서명을 검증하므로 서명되지 않은
+빌드는 업데이트가 조용히 실패한다. `script/deploy-frai.sh` 가 배포 전에 이를 확인한다.
+
+**⚠️ Tauri 판(0.1.0) 사용자는 자동으로 넘어오지 못한다.** 그쪽은 `latest.json` + minisign 서명된
+`.app.tar.gz` 를 기대하는데 Electron 은 `latest-mac.yml` + zip 을 쓴다. 형식이 다르므로 **한 번은
+DMG 로 다시 설치**해야 한다. 랜딩 페이지의 다운로드 버튼이 그 경로다.
 
 ### 공증 자격증명 — **App Store Connect API 키를 쓴다** (실측으로 확정)
 
@@ -661,50 +684,52 @@ xcrun notarytool history --key <p8 절대경로> --key-id <Key ID> --issuer <Iss
 |---|---|
 | Developer ID Application 인증서 | ✅ 키체인에 존재 (`security find-identity -v -p codesigning` 로 확인) |
 | Apple Team ID | ✅ `keys/apple/apple-team-id.txt` |
-| 공증 자격증명 (`APPLE_ID` · 앱 전용 암호) | ✅ `.env.local` |
-| Tauri 업데이터 minisign 키쌍 | ✅ `keys/frai-updater.key` (비밀키) · `keys/frai-updater.key.pub` (공개키) |
-| 공개키 등록 | ✅ `tauri.conf.json` 의 `plugins.updater.pubkey` |
-| 업데이터 아티팩트 생성 | ✅ `bundle.createUpdaterArtifacts: true` — 이 설정이 없으면 `.app.tar.gz` 가 생성되지 않는다 |
+| 공증 자격증명 (App Store Connect API 키) | ✅ `keys/apple/AuthKey_*.p8` + `.env.local` |
+| 업데이터 아티팩트 생성 | ✅ `electron-builder.yml` 의 mac target 에 **zip** — 이게 없으면 자동 업데이트가 받을 것이 없다 |
 | 빌드 환경변수 | `.env.example` 참조 → `.env.local` 로 복사해 사용 |
+| Windows 코드 서명 인증서 | ❌ 없음 — 설치 시 SmartScreen 경고가 뜬다(자동 업데이트 자체는 동작) |
 
-**⚠️ minisign 비밀키는 비밀번호 없이 생성되어 있다.** `keys/` 가 `.gitignore` 로 보호되지만, **이 키를 분실하면 기존 사용자에게 업데이트를 배포할 수 없다.** 반드시 안전한 곳에 별도 백업한다. (재발급하면 이미 설치된 앱이 새 서명을 신뢰하지 않는다.)
+**Electron 에서는 업데이터 전용 서명이 없다.** Apple 코드서명 하나가 그 역할을 겸한다
+(Squirrel.Mac 이 코드서명을 검증한다). Tauri 시절의 minisign 키쌍(`keys/frai-updater.key`)은
+**더 이상 쓰이지 않는다** — 다만 Tauri 판 0.1.0 사용자에게 마지막 업데이트를 보낼 여지가 있으니
+지우지 말고 백업만 유지한다.
 
 ### 릴리스 절차
 
+**한 명령으로 끝난다.** 검증 → 빌드(서명·공증) → 업로드 → 배포 확인까지 한다.
+
 ```bash
-# 1. 환경변수 로드 (.env.local 은 .env.example 을 복사해 채운다)
-set -a && source .env.local && set +a
-
-# 2. 서명·공증 포함 Universal binary 빌드
-#    → DMG + Frai.app.tar.gz + Frai.app.tar.gz.sig 생성
-npm run build:app
-
-# 3. 산출물 검증 (아티팩트 3종 · Universal · 서명 · 공증)
-bash scripts/verify-release.sh
-
-# 4. 업데이터 매니페스트 생성
-bash scripts/make-latest-json.sh <R2_PUBLIC_BASE_URL>
-
-# 5. R2 업로드 (버킷 pes-models, 프리픽스 frai/)
-#    ~/apps/pes/scripts/r2-put.py 참고
+cd ~/apps/pes
+./script/deploy-frai.sh              # macOS 만
+./script/deploy-frai.sh --with-win   # Windows 설치본도 함께
+./script/deploy-frai.sh --dry-run    # 무엇을 올릴지만 보여준다
 ```
 
-- 랜딩 페이지는 R2 의 JSON 을 읽으므로 **PES 재배포가 필요 없다.**
-- 업로드 후 실제 다운로드·설치·자동업데이트를 **`.app` 빌드본으로** 검증한다.
+이 스크립트가 하는 일(직접 할 때도 순서는 같다):
 
-**⚠️ 실제로 겪은 함정 — `.sig` 가 조용히 생성되지 않는다.**
+1. `npm run test:all` — 통과하지 못하면 빌드하지 않는다
+2. `.env.local` 로드 후 `npm run dist:mac`(또는 `dist`) — 서명·공증까지
+3. **DMG · zip · `latest-mac.yml` 세 가지가 다 있는지 확인**(zip 이 없으면 자동 업데이트 불가)
+4. 랜딩용 `latest.json` 생성 — `dmg.url` 이 없으면 홈페이지 다운로드 버튼이 사라진다
+5. `dl.getpes.com` 업로드 — **아티팩트를 먼저, 매니페스트를 나중에**(순서가 바뀌면 업데이터가
+   아직 없는 파일을 받으러 가서 404 를 만난다)
+6. 배포 확인 — 매니페스트 버전·`dmg.url`·각 아티팩트 HTTP 200
 
-`TAURI_SIGNING_PRIVATE_KEY_PASSWORD` 를 설정하지 않으면, 키에 비밀번호가 없더라도 `tauri build` 가
-비밀번호 프롬프트를 띄우려다 비대화형 환경에서 실패한다. 그런데 **빌드 자체는 exit 0 으로 끝나서**
-`.sig` 가 없는 줄 모르고 배포하게 된다. `.sig` 가 없으면 자동 업데이트가 동작하지 않는다.
+- ⚠️ **배포 전에 `package.json` 의 버전을 올린다.** 같은 버전으로 다시 올리면 이미 내려받은
+  사용자와 파일 내용이 달라지고, 업데이터는 새 버전을 못 본다.
+- 랜딩 페이지는 `latest.json` 을 읽으므로 **PES 재배포가 필요 없다.**
+- 업로드 후 실제 다운로드·설치·자동업데이트는 **`.app` 빌드본으로** 사람이 확인한다(창이 필요하다).
 
-- 대응 1: `.env.local` 에 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD=""` 를 **반드시 빈 값으로라도 둔다.**
-- 대응 2: `scripts/verify-release.sh` 가 `.sig` 존재를 검사한다. **배포 전에 반드시 실행한다.**
-- 이미 빌드한 산출물에 서명만 다시 붙이려면(전체 재빌드 불필요):
-  ```bash
-  env -u TAURI_SIGNING_PRIVATE_KEY npx tauri signer sign \
-    -f "$PWD/keys/frai-updater.key" -p "" <경로>/Frai.app.tar.gz
-  ```
+**⚠️ 빌드가 성공해도 자동 업데이트가 안 될 수 있다 — 두 가지를 반드시 확인한다.**
+
+Tauri 시절 `.sig` 가 조용히 빠져 배포된 적이 있다. Electron 에서도 같은 종류의 함정이 있고,
+`script/deploy-frai.sh` 가 배포 전에 셋 다 검사한다(직접 빌드할 때는 손으로 확인할 것).
+
+- **zip 이 있는가.** 자동 업데이트가 받는 것은 DMG 가 아니라 zip 이다. `electron-builder.yml` 의
+  mac target 에서 zip 을 지우면 DMG 만 생기고 업데이트는 조용히 멈춘다.
+- **`latest-mac.yml` 이 있는가.** 이게 없으면 앱이 새 버전을 아예 보지 못한다.
+- **서명·공증이 붙었는가.** Squirrel.Mac 이 코드서명을 검증하므로, 서명되지 않은 빌드는 내려받아도
+  적용되지 않는다. `codesign -dv` 와 `spctl -a -vv` 로 확인한다.
 
 
 ## 미결정 사항

@@ -6,13 +6,15 @@
  *    모르기 때문에 창을 띄우지 않고 그대로 테스트된다. 이 경계를 깨지 말 것.
  */
 
-import { app, BrowserWindow, Menu, session as electronSession, shell } from 'electron'
+import { app, BrowserWindow, dialog, Menu, session as electronSession, shell } from 'electron'
+import updaterPkg from 'electron-updater'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Auth } from './auth/index.js'
 import { createSessionStore } from './auth/store.js'
 import { registerIpc } from './ipc.js'
 import { SessionManager } from './session.js'
+import { setupAutoUpdate, type UpdaterHandle } from './updater.js'
 import { cspFor, DEV_URL as DEFAULT_DEV_URL } from '../shared/csp.js'
 import { IPC } from '../shared/types.js'
 
@@ -73,10 +75,36 @@ function createWindow(): BrowserWindow {
 
 function buildMenu(getWindow: () => BrowserWindow | null): void {
   const send = (view: 'grid' | 'board') => getWindow()?.webContents.send(IPC.setView, view)
+  const isMac = process.platform === 'darwin'
+
+  // 자동 확인과 별개로 **사람이 직접 확인할 수단**을 둔다. 자동 업데이트는 조용히
+  // 도는 기능이라, 눌러서 결과를 볼 수 없으면 되는지 안 되는지 알 방법이 없다.
+  const checkUpdate: Electron.MenuItemConstructorOptions = {
+    label: '업데이트 확인…',
+    click: () => void updater?.check()
+  }
 
   const template: Electron.MenuItemConstructorOptions[] = [
-    ...(process.platform === 'darwin'
-      ? [{ role: 'appMenu' as const }]
+    // macOS 는 관례대로 앱 메뉴에 둔다. `role: 'appMenu'` 를 쓰면 항목을 끼울 수 없어
+    // 기본 구성을 그대로 펼쳐 쓴다.
+    ...(isMac
+      ? ([
+          {
+            label: app.name,
+            submenu: [
+              { role: 'about' },
+              checkUpdate,
+              { type: 'separator' },
+              { role: 'services' },
+              { type: 'separator' },
+              { role: 'hide' },
+              { role: 'hideOthers' },
+              { role: 'unhide' },
+              { type: 'separator' },
+              { role: 'quit' }
+            ]
+          }
+        ] as Electron.MenuItemConstructorOptions[])
       : []),
     { role: 'editMenu' },
     {
@@ -84,6 +112,8 @@ function buildMenu(getWindow: () => BrowserWindow | null): void {
       submenu: [
         { label: '바둑판', accelerator: 'CmdOrCtrl+1', click: () => send('grid') },
         { label: '세션 목록', accelerator: 'CmdOrCtrl+2', click: () => send('board') },
+        // Windows·Linux 에는 앱 메뉴가 없으므로 여기에 둔다.
+        ...(isMac ? [] : ([{ type: 'separator' }, checkUpdate] as Electron.MenuItemConstructorOptions[])),
         { type: 'separator' },
         { role: 'reload' },
         { role: 'toggleDevTools' },
@@ -102,6 +132,7 @@ function buildMenu(getWindow: () => BrowserWindow | null): void {
 }
 
 let mainWindow: BrowserWindow | null = null
+let updater: UpdaterHandle | null = null
 
 // 두 인스턴스가 동시에 뜨면 기기 ID·세션 파일을 두고 경합한다.
 if (!app.requestSingleInstanceLock()) {
@@ -140,6 +171,27 @@ if (!app.requestSingleInstanceLock()) {
     registerIpc({ sessions, auth, getWindow: () => mainWindow })
 
     mainWindow = createWindow()
+
+    // 자동 업데이트. 정책은 `updater.ts` 에 있고 여기서는 실제 구현만 꽂는다.
+    updater = setupAutoUpdate({
+      updater: updaterPkg.autoUpdater,
+      isPackaged: app.isPackaged,
+      // ⚠️ 진행 중인 세션이 있으면 재시작을 제안하지 않는다 — 몇 분씩 걸리는 AI 작업이
+      //    통째로 날아간다. 앱을 끌 때 자동으로 적용되므로 재촉할 이유가 없다.
+      runningSessions: () => sessions.runningCount,
+      promptRestart: async (version) => {
+        const { response } = await dialog.showMessageBox({
+          type: 'info',
+          buttons: ['지금 재시작', '나중에'],
+          defaultId: 0,
+          cancelId: 1,
+          message: `FRAI ${version} 을 내려받았습니다.`,
+          detail: '지금 재시작하면 바로 적용됩니다. 나중을 고르면 앱을 끌 때 자동으로 적용됩니다.'
+        })
+        return response === 0
+      }
+    })
+
     buildMenu(() => mainWindow)
 
     app.on('activate', () => {
@@ -147,7 +199,10 @@ if (!app.requestSingleInstanceLock()) {
     })
 
     // 앱이 끝나면 남은 세션(자식 프로세스·연결)을 전부 정리한다.
-    app.on('before-quit', () => sessions.cancelAll())
+    app.on('before-quit', () => {
+      sessions.cancelAll()
+      updater?.stop()
+    })
   })
 
   app.on('window-all-closed', () => {

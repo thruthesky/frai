@@ -1,7 +1,7 @@
 {
   "name": "frai",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "main": "dist/main/index.js",
   "description": "여러 인공지능을 한 화면에서 — 무료 인공지능 개발 툴",
