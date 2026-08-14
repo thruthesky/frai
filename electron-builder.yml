@@ -1,0 +1,61 @@
+# FRAI 패키징·서명·배포 설정.
+#
+# 배포처는 dl.getpes.com 정적 서버다(기존 Tauri 판과 동일한 인프라를 그대로 쓴다).
+# electron-updater 의 generic provider 가 그 경로의 latest-mac.yml / latest.yml 을 읽는다.
+appId: com.getpes.frai
+productName: FRAI
+copyright: © PES
+
+directories:
+  output: dist-release
+  buildResources: build
+
+# 번들에 넣을 것 — 소스와 Rust 잔재는 넣지 않는다.
+files:
+  - dist/**
+  - package.json
+  - '!**/*.map'
+
+# ⚠️ asar 안에 두면 실행 파일 권한이 사라지는 것들이 있다. 지금은 네이티브 모듈이
+#    없으므로 비워 두지만, node-pty 를 넣으면 여기에 unpack 규칙이 필요해진다.
+asar: true
+
+mac:
+  category: public.app-category.developer-tools
+  # x64 Mac 은 지원 대상에서 뺀다(사용자 결정). Universal 을 만들지 않으므로
+  # 네이티브 모듈을 붙일 때 아키텍처 궁합 문제도 줄어든다.
+  target:
+    - target: dmg
+      arch: [arm64]
+    # 자동 업데이트는 DMG 가 아니라 zip 을 받는다. 둘 다 올려야 한다.
+    - target: zip
+      arch: [arm64]
+  # 서브프로세스(claude 등)를 띄우고 JIT 를 쓰므로 Hardened Runtime 예외가 필요하다.
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  # 공증은 App Store Connect API 키로 한다(APPLE_ID 방식은 이 프로젝트에서 401 로 실패했다).
+  # APPLE_API_KEY · APPLE_API_ISSUER · APPLE_API_KEY_PATH 환경변수를 읽는다.
+  notarize: true
+
+dmg:
+  artifactName: ${productName}-${version}-${arch}.${ext}
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  artifactName: ${productName}-${version}-setup.${ext}
+  # ⚠️ 코드 서명이 없으면 Defender SmartScreen 이 강하게 막는다.
+  #    임의 명령을 실행하는 앱이라 선택이 아니라 필수다(인증서 준비 후 여기에 설정을 채운다).
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  perMachine: false
+
+publish:
+  - provider: generic
+    url: https://dl.getpes.com/frai
+    # 채널 파일(latest-mac.yml·latest.yml)도 같은 경로에 올라간다.

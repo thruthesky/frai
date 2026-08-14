@@ -1,6 +1,10 @@
-import { invoke } from '@tauri-apps/api/core'
-import { listen } from '@tauri-apps/api/event'
-import type { AuthStatus, ChatMessage, ProviderInfo, SessionEvent, Usage } from './types'
+import type { AuthStatus, ChatMessage, ProviderInfo, SessionEvent, Usage } from '../../shared/types'
+
+/**
+ * main 프로세스와 대화하는 유일한 통로. preload 가 `contextBridge` 로 심어 준다.
+ * 여기 없는 기능은 renderer 가 할 수 없다 — 그것이 이 앱의 신뢰 경계다.
+ */
+const frai = window.frai
 
 let seq = 0
 let columnSeq = 0
@@ -87,8 +91,8 @@ export class SessionStore {
   }
 
   async init() {
-    this.providers = await invoke<ProviderInfo[]>('list_providers')
-    this.auth = await invoke<AuthStatus>('auth_status')
+    this.providers = await frai.listProviders()
+    this.auth = await frai.authStatus()
 
     // 처음 화면은 2×2 로 시작한다. 바둑판이 이 앱의 기본 형태다.
     if (this.sessions.length === 0) {
@@ -96,10 +100,10 @@ export class SessionStore {
       this.sessions = [new Session(id), new Session(id), new Session(id), new Session(id)]
     }
 
-    await listen<SessionEvent>('session-event', (e) => this.#apply(e.payload))
+    frai.onSessionEvent((ev) => this.#apply(ev))
     // 네이티브 메뉴(보기 → 세션 목록)에서 오는 화면 전환 요청.
-    await listen<'grid' | 'board'>('set-view', (e) => {
-      this.view = e.payload
+    frai.onSetView((view) => {
+      this.view = view
     })
     this.ready = true
   }
@@ -149,9 +153,9 @@ export class SessionStore {
     if (!prompt || session.streaming) return
 
     session.error = null
-    // ⚠️ invoke 를 부르기 **전에** 잠근다.
+    // ⚠️ main 을 부르기 **전에** 잠근다.
     // `streaming` 은 원래 started 이벤트에서만 켜지는데, started 는 릴레이 HTTP 가
-    // 성공한 뒤에야 나간다(relay.rs). 그 사이(네트워크 대기 구간) 위의 가드가 통과되어
+    // 성공한 뒤에야 나간다(main/provider/relay.ts). 그 사이(네트워크 대기 구간) 위의 가드가 통과되어
     // 같은 칸에 재전송이 들어가면, start() 가 이전 태스크를 취소하고 새 요청을 열어
     // 서버 무료 횟수가 이중으로 차감된다. 전송을 시작한 시점에 잠그는 것이 맞다.
     // (error·done 이 모두 streaming 을 false 로 되돌리므로 잠긴 채 남지 않는다.)
@@ -166,14 +170,12 @@ export class SessionStore {
     session.messages.push({ role: 'user', content: prompt, done: true })
 
     try {
-      await invoke('send_message', {
-        request: {
-          sessionId: session.id,
-          provider: session.providerId,
-          messages: session.messages
-            .filter((m) => m.done || m.role === 'user')
-            .map((m) => ({ role: m.role, content: m.content })),
-        },
+      await frai.sendMessage({
+        sessionId: session.id,
+        provider: session.providerId,
+        messages: session.messages
+          .filter((m) => m.done || m.role === 'user')
+          .map((m) => ({ role: m.role, content: m.content })),
       })
     } catch (e) {
       session.error = String(e)
@@ -188,7 +190,7 @@ export class SessionStore {
   }
 
   async cancel(session: Session) {
-    await invoke('cancel_session', { sessionId: session.id })
+    await frai.cancelSession(session.id)
     session.streaming = false
   }
 
@@ -213,7 +215,7 @@ export class SessionStore {
     this.authBusy = true
     this.authError = null
     try {
-      this.auth = await invoke<AuthStatus>('auth_sign_in')
+      this.auth = await frai.authSignIn()
     } catch (e) {
       this.authError = String(e)
     } finally {
@@ -225,7 +227,7 @@ export class SessionStore {
     this.authBusy = true
     this.authError = null
     try {
-      this.auth = await invoke<AuthStatus>('auth_sign_out')
+      this.auth = await frai.authSignOut()
     } catch (e) {
       this.authError = String(e)
     } finally {

@@ -49,7 +49,7 @@
 </script>
 
 <!-- 타이틀바를 투명 처리했으므로 신호등 버튼 자리를 비워 두고 이 영역을 드래그 핸들로 쓴다. -->
-<div class="titlebar" data-tauri-drag-region>
+<div class="titlebar">
   <!-- 마크는 랜딩(getpes.com/frai)의 그라디언트와 같은 색이다. 받은 곳과 실행한
        앱이 같은 제품으로 읽히려면 이 색이 어긋나면 안 된다. -->
   <span class="mark" aria-hidden="true">F</span>
@@ -166,6 +166,13 @@
     background: var(--surface-2);
     border-bottom: 1px solid var(--line);
     user-select: none;
+    /* Electron 에서 창을 끌어 옮기는 영역. Tauri 의 data-tauri-drag-region 대응물이다. */
+    -webkit-app-region: drag;
+  }
+  /* ⚠️ 드래그 영역 안의 버튼·입력은 반드시 no-drag 로 되돌린다.
+     빠뜨리면 클릭이 창 이동으로 먹혀 버튼이 죽은 것처럼 보인다. */
+  .titlebar button {
+    -webkit-app-region: no-drag;
   }
   .mark {
     display: grid;
@@ -247,7 +254,7 @@
 
   /* 타이틀바와 같은 배경을 쓰고 사이 경계선을 두지 않는다. 두 줄이 하나의 크롬으로
      읽히게 하려는 것이며, 물리적으로 한 줄로 합치지는 않는다 — 타이틀바를 컨트롤로
-     채우면 data-tauri-drag-region 이 사라져 창을 움직일 수 없게 된다. */
+     채우면 드래그 가능한 영역이 사라져 창을 움직일 수 없게 된다. */
   .toolbar {
     display: flex;
     align-items: center;

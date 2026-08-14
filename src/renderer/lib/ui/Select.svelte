@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { ProviderInfo } from '../types'
+  import type { ProviderInfo } from '../../../shared/types'
   import Icon from './Icon.svelte'
   import { firstEnabled, initialIndex, lastEnabled, nextEnabled } from './select-state'
 

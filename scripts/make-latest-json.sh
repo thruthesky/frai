@@ -28,8 +28,16 @@ OUT="dist-release/latest.json"
 
 [ -f "$SIG_FILE" ] || { echo "❌ $SIG_FILE 이 없다. 먼저 빌드하고 서명하라." >&2; exit 1; }
 
+# ⚠️ `dmg` 키는 업데이터가 아니라 **랜딩 페이지**(web/src/routes/frai/+page.svelte)가 읽는다.
+#    거기서 `release.dmg.url` 이 없으면 다운로드 버튼 자체가 렌더되지 않는다.
+#    이 키가 빠진 매니페스트를 올리면 홈페이지에서 내려받을 수단이 사라지므로 필수다.
+DMG_FILE="$BUNDLE/dmg/Frai_${VERSION}_universal.dmg"
+[ -f "$DMG_FILE" ] || { echo "❌ $DMG_FILE 이 없다. 먼저 빌드하라(랜딩 다운로드 링크에 필요)." >&2; exit 1; }
+DMG_SIZE=$(stat -f%z "$DMG_FILE")
+
 SIG=$(cat "$SIG_FILE")
 URL="$BASE/frai/releases/$VERSION/Frai.app.tar.gz"
+DMG_URL="$BASE/frai/releases/$VERSION/Frai_${VERSION}_universal.dmg"
 PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 mkdir -p dist-release
@@ -47,6 +55,10 @@ cat > "$OUT" <<JSON
       "signature": "$SIG",
       "url": "$URL"
     }
+  },
+  "dmg": {
+    "url": "$DMG_URL",
+    "size": $DMG_SIZE
   }
 }
 JSON
@@ -54,4 +66,11 @@ JSON
 echo "생성: $OUT"
 echo "  version : $VERSION"
 echo "  url     : $URL"
-node -e "JSON.parse(require('fs').readFileSync('$OUT','utf8')); console.log('  JSON 유효성: OK')"
+echo "  dmg     : $DMG_URL ($((DMG_SIZE / 1024 / 1024))MB)"
+# 랜딩 페이지가 읽는 키까지 확인한다 — 형식만 맞고 dmg 가 없으면 버튼이 사라진다.
+node -e "
+const j = JSON.parse(require('fs').readFileSync('$OUT','utf8'));
+if (!j.dmg || !j.dmg.url || !j.dmg.size) { console.error('  ❌ dmg 키 누락 — 랜딩 다운로드 버튼이 죽는다'); process.exit(1); }
+if (!j.platforms['darwin-aarch64'] || !j.platforms['darwin-aarch64'].signature) { console.error('  ❌ 업데이터 서명 누락'); process.exit(1); }
+console.log('  JSON 유효성: OK (dmg·platforms 키 확인)');
+"

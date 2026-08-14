@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Hardened Runtime 예외.
+
+  ⚠️ 이 앱은 사용자가 설치한 CLI(claude 등)를 자식 프로세스로 띄운다. 예외를 주지
+  않으면 공증은 통과해도 실행 시점에 자식 프로세스나 JIT 가 막힌다.
+  필요한 것만 켠다 — 예외 하나하나가 방어선을 낮추므로 "혹시 몰라서" 추가하지 않는다.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <!-- Chromium(V8)이 JIT 를 쓴다. Electron 앱에 필수다. -->
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+    <!-- 서명되지 않은 사용자 설치 CLI 를 자식으로 실행하기 위해 필요하다. -->
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+    <!-- 자식 프로세스에 PATH 등 환경변수를 물려준다(GUI PATH 함정 대응). -->
+    <key>com.apple.security.cs.allow-dyld-environment-variables</key>
+    <true/>
+    <!-- 자식 프로세스가 부모의 샌드박스 설정을 이어받는다. -->
+    <key>com.apple.security.inherit</key>
+    <true/>
+  </dict>
+</plist>

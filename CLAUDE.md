@@ -39,15 +39,15 @@
 - ❌ **`osascript` 로 앱을 `frontmost` 로 만드는 것 — 절대 금지**
 - ❌ **전체 화면 스크린샷 — 금지** (사람의 작업 내용이 그대로 찍힌다)
 - ❌ **테스트를 위해 앱 창을 띄우는 것 — 금지**
-- ✅ **모든 검증은 창을 띄우지 않는 수단으로 한다.** `cargo test` · `npm run test` · `npm run check`
+- ✅ **모든 검증은 창을 띄우지 않는 수단으로 한다.** `npm run test:all` (타입 → 보안 규칙 → 테스트)
 - ✅ 어댑터·상태 로직은 **런타임 없이** 테스트되도록 설계한다.
-  (`EventSink` 를 `AppHandle` 이 아니라 클로저로 둔 이유가 이것이다 — 자식 프로세스 실행과 HTTP
-  스트리밍을 **실제로 끝까지 돌리면서도** Tauri 앱을 띄우지 않는다. 상세: [TEST.md](TEST.md))
+  (`EventSink` 를 클로저로 두고 main 로직이 `electron` 을 import 하지 않는 이유가 이것이다 — 자식
+  프로세스 실행과 HTTP 스트리밍을 **실제로 끝까지 돌리면서도** 앱 창을 띄우지 않는다.)
 
 **"화면에 띄워야만 확인할 수 있다" 는 판단이 들면, 그것은 설계를 고쳐야 한다는 신호다.**
 띄울 방법을 찾지 말고, 띄우지 않고 확인되도록 코드를 바꾼다.
 
-**앱 실행(`npm run dev:app`)은 사람이 직접 볼 때만 한다.** 인공지능은 검증 목적으로 실행하지 않는다.
+**앱 실행(`npm run dev`)은 사람이 직접 볼 때만 한다.** 인공지능은 검증 목적으로 실행하지 않는다.
 
 ### 🚫 로컬 DB·로컬 Docker 를 쓰지 않는다 — **원격 getpes.com 서버를 직접 액세스한다**
 
@@ -88,43 +88,47 @@ pkill -f "ssh -f -N -L 15433:"
 
 ### 이 프로젝트의 검증 수단
 
-**한 번에 전부 돌리기: `npm run test:all`** (타입 검사 → 프론트 → Rust 순서)
+**한 번에 전부 돌리기: `npm run test:all`** (타입 검사 → 보안 규칙 → 테스트 순서)
 
 | 대상 | 명령 | 개수 | 창 뜸? |
 |---|---|---|---|
-| Rust 유닛 (stream-json·SSE 파싱, PKCE, CLI 탐지) | `cargo test` | 29 | ❌ |
-| Rust 통합 — **실제 `claude` 프로세스 실행**, 릴레이 모의 SSE 서버 | `cargo test` (`integration_tests.rs`) | 9 | ❌ |
-| 프론트 상태·칸반·이벤트 라우팅 | `npm run test` (vitest, node 환경) | 26 | ❌ |
-| 타입 정합성 | `npm run check` (svelte-check) | 138 파일 | ❌ |
+| main 유닛 (stream-json·SSE 파싱, PKCE, CLI 탐지) | `npm run test` | 29 | ❌ |
+| main 통합 — 세션→프로바이더→이벤트, **모의 SSE 서버를 실제로 띄움** | `npm run test` (`session.test.ts`) | 8 | ❌ |
+| 보안 규칙 (nodeIntegration·contextIsolation·renderer 의 Node API) | `npm run check:security` | 7 규칙 | ❌ |
+| 프론트 상태·칸반·이벤트 라우팅 | `npm run test` (vitest, node 환경) | 43 | ❌ |
+| 타입 정합성 | `npm run check` (svelte-check + tsc) | 143 파일 | ❌ |
 | PES 인증 순수 로직 (redirect_uri·PKCE) | `cd ~/apps/pes/web && pnpm vitest run src/lib/server/frai` | 10 | ❌ |
 | **PES 인증 DB 경로** (code 발급→교환→토큰) | 위 + `DATABASE_URL` 을 **원격 터널**로 지정 | 8 | ❌ |
 
-**핵심: 위 64개 전부가 창을 띄우지 않는다.** `EventSink` 를 `AppHandle` 이 아니라 클로저로 둔 덕분에, 어댑터를 **실제로 끝까지 돌리면서도**(프로세스 spawn, HTTP 스트리밍 포함) Tauri 런타임이 필요 없다. **새 기능을 붙일 때도 이 성질을 깨지 않는다** — 방법은 [TEST.md](TEST.md) 4장.
+**핵심: 위 전부가 창을 띄우지 않는다(앱 테스트 80개).** `EventSink` 를 클로저로 두고 **main 로직이 `electron` 을 import 하지 않기 때문에**, 어댑터를 실제로 끝까지 돌리면서도(프로세스 spawn, HTTP 스트리밍 포함) Electron 런타임이 필요 없다. **새 기능을 붙일 때도 이 성질을 깨지 않는다** — 방법은 [TEST.md](TEST.md) 4장.
 
-**⚠️ macOS 에서는 `tauri-driver`(WebDriver)를 쓸 수 없다.** WKWebView 가 WebDriver 를 지원하지 않는다. 그러므로 **웹뷰 픽셀 확인에 의존하는 테스트를 만들지 말고**, 검증 대상 로직을 UI 밖으로 빼서 위 수단으로 확인한다.
+**⚠️ Playwright(Electron) E2E 를 채택하지 않는다.** 창을 띄우기 때문이다. **웹뷰 픽셀 확인에 의존하는 테스트를 만들지 말고**, 검증 대상 로직을 UI 밖으로 빼서 위 수단으로 확인한다.
 
 **⚠️ 사람 손이 반드시 필요한 것(예: 실제 Apple ID 로그인, 유료 결제)이 있다면, 그 항목만 명시하고 나머지는 전부 자동 검증을 끝낸 뒤 보고한다.**
 
 ### 자동 검증이 어려운 항목
 
-`.app` 빌드본의 CLI PATH · 웹뷰 픽셀 렌더링 · **브라우저에서의 Firebase 로그인 그 자체** 3가지뿐이다.
+패키징 빌드본의 CLI PATH · 화면 픽셀 렌더링 · **브라우저에서의 Firebase 로그인 그 자체** 3가지뿐이다.
 (로그인 이후의 서버 흐름 — code 발급·PKCE 교환·토큰 검증·폐기 — 은 **원격 DB 로 실제 검증했다.**)
 사유와 대안은 [TEST.md](TEST.md) 5장에 정리되어 있다. **이 목록은 짧게 유지한다.**
 
 
 ## 기술 스택
 
-- Tauri v2 + Svelte5 + Vite 로 인공지능 개발 툴을 데스크톱 응용프로그램으로 개발한다.
+- Electron + Svelte 5 + Vite 로 인공지능 개발 툴을 데스크톱 응용프로그램으로 개발한다.
+- **2026-08-14 Tauri v2 에서 Electron 으로 전면 이전했다.** 근거는 `.cowork/migration-to-electron/final-report.md` —
+  PTY 터미널·Docker·임의 명령 실행이 필요해졌고(생태계 격차), Windows 를 지원해야 하며(크로미움 단일 렌더),
+  인공지능 주도 개발에서 node-pty·dockerode 쪽 학습 데이터가 압도적이기 때문이다.
 
 | 항목 | 선택 |
 |---|---|
-| 셸 | Tauri v2 |
-| 백엔드 | Rust |
+| 셸 | Electron (main · preload · renderer 3층) |
+| 백엔드 | TypeScript (Node, Electron main 프로세스) |
 | 프론트엔드 | Svelte 5 + Vite (**SvelteKit 사용 안 함**) |
-| DB (대화 내용) | 로컬 SQLite (`tauri-plugin-sql`) |
+| DB (대화 내용) | 로컬 SQLite (미구현 — 이전 시 `tauri-plugin-sql` 계획은 폐기) |
 | DB (세션 목록) | **getpes.com 과 공유하는 PostgreSQL** — 로그인 시 동기화 |
 | 계정 | PES 와 호환 (Firebase Auth → `/api/auth/session`) |
-| 키 저장 | OS 키체인 (macOS Keychain) |
+| 키 저장 | Electron `safeStorage` (macOS 키체인 · Windows DPAPI) |
 
 ### 프론트엔드 규칙
 
@@ -138,15 +142,17 @@ pkill -f "ssh -f -N -L 15433:"
 
 | 명령 | 용도 |
 |---|---|
-| `npm run dev:app` | Tauri 개발 모드 (Vite dev 서버 + 앱 창, HMR 동작) |
-| `npm run build:app` | Universal binary 프로덕션 빌드 |
+| `npm run dev` | 개발 모드 (Vite dev 서버 1420 + Electron 창, HMR 동작) |
+| `npm run build` | main · preload · renderer 번들 |
+| `npm run dist:mac` / `dist:win` / `dist` | 패키징 (macOS arm64 / Windows x64 / 둘 다) |
+| `npm run test:all` | 타입 → 보안 규칙 → 테스트 (창을 띄우지 않는다) |
 | `npm run check` | `svelte-check` 타입 검사 |
 
 **⚠️ 개발 포트는 1420 이다. Vite 기본값 5173 을 쓰지 않는다.**
 
-형제 프로젝트 **PES(`~/apps/pes/web`)가 5173 을 사용**하기 때문이다. 두 프로젝트를 동시에 열어두고 개발하면 FRAI 의 Vite 가 조용히 다른 포트로 밀려나고, `tauri.conf.json` 의 `devUrl` 은 그대로라서 **FRAI 창에 PES 사이트가 로드된다.** (실제로 겪은 문제다.)
+형제 프로젝트 **PES(`~/apps/pes/web`)가 5173 을 사용**하기 때문이다. 두 프로젝트를 동시에 열어두고 개발하면 FRAI 의 Vite 가 조용히 다른 포트로 밀려나고, main 이 여는 URL 은 그대로라서 **FRAI 창에 PES 사이트가 로드된다.** (실제로 겪은 문제다.)
 
-- Vite: `1420`, HMR: `1421` — `vite.config.ts` 와 `tauri.conf.json` 의 `devUrl`·`devCsp` 세 곳이 **항상 일치해야 한다.**
+- Vite: `1420`, HMR: `1421` — `vite.renderer.config.ts` 와 `src/main/index.ts` 의 `DEV_URL`·CSP 가 **항상 일치해야 한다.**
 - `strictPort: true` 를 설정했다. 포트가 점유되어 있으면 조용히 옮겨가지 않고 **실패한다.** 엉뚱한 사이트가 뜨는 것보다 명확한 실패가 낫기 때문이며, 이 설정을 끄지 않는다.
 
 
@@ -235,7 +241,7 @@ FRAI ──POST──> https://getpes.com/frai/api/chat ──> api.deepseek.com
 
 ### 릴레이 API 규약 (FRAI ↔ getpes.com)
 
-클라이언트(`src-tauri/src/provider/relay.rs`)는 이미 이 규약으로 구현되어 있다. 서버를 만들 때 맞춘다.
+클라이언트(`src/main/provider/relay.ts`)는 이미 이 규약으로 구현되어 있다. 서버를 만들 때 맞춘다.
 
 ```
 POST /frai/api/chat
@@ -380,7 +386,7 @@ PES 의 인증 구조 (`~/apps/pes/web/src/routes/api/auth/session/+server.ts`, 
 
 **FRAI 도 같은 `uid` 를 얻어야 세션 목록을 공유할 수 있다.** 즉 Firebase idToken 을 얻어 `/api/auth/session` 을 그대로 호출하는 것이 정답이다. 문제는 **idToken 을 어떻게 얻느냐**이며, 방식이 셋이다.
 
-**✅ 확정: A — 시스템 브라우저 + 루프백 콜백 + PKCE.** (`src-tauri/src/auth.rs` 구현 완료)
+**✅ 확정: A — 시스템 브라우저 + 루프백 콜백 + PKCE.** (`src/main/auth/` 구현 완료)
 
 CSP 를 열지 않아도 되고, PES 가 지원하는 로그인 제공자를 그대로 쓸 수 있다.
 
@@ -401,7 +407,7 @@ CSP 를 열지 않아도 되고, PES 가 지원하는 로그인 제공자를 그
 
 | 쪽 | 파일 | 상태 |
 |---|---|---|
-| 앱 | `src-tauri/src/auth.rs` | ✅ 브라우저 + 루프백 + PKCE, 토큰은 키체인 |
+| 앱 | `src/main/auth/` | ✅ 브라우저 + 루프백 + PKCE, 토큰은 `safeStorage`, 로그아웃 시 서버 revoke 호출 |
 | 서버 | `~/apps/pes/web/src/routes/frai/auth/+server.ts` | ✅ code 발급 · 루프백 리다이렉트 |
 | 서버 | `~/apps/pes/web/src/routes/frai/api/auth/exchange/+server.ts` | ✅ PKCE 검증 · 토큰 발급 |
 | 서버 | `~/apps/pes/web/src/routes/frai/api/auth/revoke/+server.ts` | ✅ 토큰 폐기(로그아웃) |
@@ -497,29 +503,36 @@ web.frai_columns
 ## 디렉토리 구조 (예정)
 
 ```
-src-tauri/src/
-  main.rs
-  lib.rs             # 앱 조립 · 명령 등록 · 종료 시 세션 정리
-  events.rs          # ★ 통일 이벤트(SessionEvent) + EventSink
-  commands.rs        # 프론트가 부를 수 있는 것 전부 (최소 권한)
-  session.rs         # 세션별 태스크·취소 관리
-  provider/
-    mod.rs           # Provider 트레이트 · ChatRequest · ProviderInfo
-    detect.rs        # ★ 로그인 셸 PATH 확보 + CLI 탐지 (CLI_SPECS 허용 목록)
-    claude_cli.rs    # 서브프로세스 어댑터 (claude 검증 완료, 나머지는 실험적)
-    relay.rs         # getpes.com 릴레이 어댑터 (기본 AI)
-  auth.rs            # ★ PES 호환 로그인 (브라우저 + 루프백 + PKCE) · 키체인 보관
-  (예정) db.rs       # SQLite
+src/
+  main/                # Electron main — 여기서만 Node/OS 를 만진다
+    index.ts           # ★ 앱 조립 · 창 · CSP · 메뉴 (electron import)
+    ipc.ts             # ★ renderer 가 부를 수 있는 것 전부 (electron import)
+    events.ts          # ★ 통일 이벤트(SessionEvent) + EventSink — electron 을 모른다
+    session.ts         # 세션별 태스크·취소 (AbortSignal). 오류 emit 은 여기 한 곳뿐
+    provider/
+      index.ts         # Provider 인터페이스 · resolve · listProviders
+      detect.ts        # ★ 로그인 셸 PATH 확보 + CLI 탐지 (Windows PATHEXT 대응)
+      cli.ts           # 서브프로세스 어댑터 + 프로세스 그룹 종료
+      relay.ts         # getpes.com 릴레이 어댑터 (기본 AI)
+    auth/
+      pkce.ts          # 순수 PKCE (창·네트워크 없이 테스트)
+      index.ts         # 루프백 + 브라우저 로그인 흐름 (저장소를 주입받는다)
+      store.ts         # safeStorage 어댑터 (electron import)
+  preload/
+    index.ts           # ★ contextBridge 화이트리스트 — 이 앱의 신뢰 경계
+  renderer/            # Svelte 5 + TypeScript (Node API 접근 불가)
+    index.html · main.ts · App.svelte · app.css · global.d.ts
+    lib/
+      sessions.svelte.ts   # 세션·칸반 상태 (runes) + 이벤트 라우팅
+      SessionCard.svelte · KanbanBoard.svelte · ui/
+  shared/
+    types.ts           # main·renderer 공용 타입 + IPC 채널 목록(화이트리스트의 출처)
 
-src/                 # Svelte 5 + TypeScript
-  main.ts
-  app.css            # 색 토큰 (다크 기본 + 라이트 대응)
-  App.svelte         # 바둑판 그리드 + 브로드캐스트 입력
-  lib/
-    types.ts             # Rust 타입과 1:1 대응 — 한쪽만 고치지 말 것
-    sessions.svelte.ts   # 세션·칸반 상태 (runes) + 이벤트 라우팅
-    SessionCard.svelte   # 바둑판 칸 하나
-    KanbanBoard.svelte   # 세션 목록 (칸반 보드)
+⚠️ **`main/` 로직 모듈은 `electron` 을 import 하지 않는다.** 예외는 `main/index.ts`·
+`main/ipc.ts`·`main/auth/store.ts` 셋뿐이며, `npm run check:security` 가 이 규칙을 강제한다.
+이 경계가 "창을 띄우지 않는 검증" 을 가능하게 한다.
+
+src-tauri/                 # 옛 Tauri 구현 — 참고용으로 남겨 둔다(빌드에서 제외)
 ```
 
 

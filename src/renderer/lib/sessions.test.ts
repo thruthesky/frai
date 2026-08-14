@@ -6,21 +6,38 @@
  * 즉 실제 앱과 같은 경로로 상태가 바뀌는지 검증한다.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ProviderInfo, SessionEvent } from './types'
+import type { ProviderInfo, SessionEvent } from '../../shared/types'
 
 const h = vi.hoisted(() => ({
   invoke: vi.fn(),
-  /** Rust 가 보낼 `session-event` 리스너를 잡아 둔다. */
+  /** main 이 보낼 세션 이벤트 리스너를 잡아 둔다. */
   sessionListener: null as null | ((e: { payload: SessionEvent }) => void),
 }))
 
-vi.mock('@tauri-apps/api/core', () => ({ invoke: h.invoke }))
-vi.mock('@tauri-apps/api/event', () => ({
-  listen: vi.fn(async (name: string, handler: (e: { payload: SessionEvent }) => void) => {
-    if (name === 'session-event') h.sessionListener = handler
-    return () => {}
-  }),
-}))
+/**
+ * preload 가 심어 주는 `window.frai` 를 흉내 낸다.
+ *
+ * 각 함수가 예전 IPC 이름·인자 모양 그대로 `h.invoke` 를 부르므로, 이전부터 있던
+ * 검증(어떤 명령이 몇 번 어떤 인자로 갔는가)이 스택을 바꾼 뒤에도 그대로 안전망이 된다.
+ * ⚠️ `sessions.svelte.ts` 가 모듈 최상단에서 `window.frai` 를 캡처하므로,
+ *    이 stub 은 반드시 아래 동적 import **보다 먼저** 실행되어야 한다.
+ */
+vi.stubGlobal('window', {
+  frai: {
+    listProviders: () => h.invoke('list_providers'),
+    sendMessage: (request: unknown) => h.invoke('send_message', { request }),
+    cancelSession: (sessionId: string) => h.invoke('cancel_session', { sessionId }),
+    authStatus: () => h.invoke('auth_status'),
+    authSignIn: () => h.invoke('auth_sign_in'),
+    authSignOut: () => h.invoke('auth_sign_out'),
+    diagnostics: () => h.invoke('diagnostics'),
+    onSessionEvent: (handler: (ev: SessionEvent) => void) => {
+      h.sessionListener = (e) => handler(e.payload)
+      return () => {}
+    },
+    onSetView: () => () => {},
+  },
+})
 
 const { BACKLOG_ID, Session, SessionStore } = await import('./sessions.svelte')
 
