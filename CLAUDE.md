@@ -196,13 +196,15 @@ pkill -f "ssh -f -N -L 15433:"
 아무 설정 없이 **즉시, 무료로** 쓸 수 있는 첫 경험을 제공한다. BYOK 앱의 가장 큰 진입 장벽인 "API 키 발급"을 첫 실행에서 제거하는 것이 목적이다.
 
 ```
-FRAI ──POST──> https://getpes.com/frai/api/chat ──> AKRouter (기본) · DeepSeek · 그 외
-     <──SSE──                                   <──   전부 OpenAI Chat Completions 규격
+FRAI ──POST──> https://getpes.com/frai/api/chat ──> api.deepseek.com (v4 Flash)
+     <──SSE──                                   <──   OpenAI Chat Completions 규격
 ```
 
 - **AI 서비스 API 키는 서버에만 둔다.** 앱에는 절대 내려보내지 않는다.
 - **익명 5회/일(기기 ID) · 로그인 20회/일(uid)** + 전역 일일 예산 상한. 초과하면 개인 API 키 등록 또는 CLI 연동으로 안내한다.
-- **두뇌는 언제든 갈아끼운다.** 표준은 **OpenAI Chat Completions 프로토콜**이므로 프로바이더 교체는 환경변수 세 개(`FRAI_LLM_PROVIDER`·모델·키)를 바꾸는 일이지 코드를 고치는 일이 아니다. 서버 구현은 `~/apps/pes/web/src/lib/server/llm/` 이며 레지스트리에 akrouter·deepseek·openai·openrouter·ollama 가 들어 있다. 레지스트리 밖은 `FRAI_LLM_BASE_URL` 로 지정한다.
+- **기본 두뇌는 DeepSeek v4 Flash 직결이다.** 키는 PES 라리아챗봇과 같은 `DEEPSEEK_API_KEY` 를 쓴다.
+- **두뇌는 언제든 갈아끼운다.** 표준은 **OpenAI Chat Completions 프로토콜**이므로 프로바이더 교체는 환경변수(`FRAI_LLM_PROVIDER`·모델·키)를 바꾸는 일이지 코드를 고치는 일이 아니다. 서버 구현은 `~/apps/pes/web/src/lib/server/llm/` 이며 레지스트리에 deepseek(기본)·openai·openrouter·ollama 가 들어 있다. 레지스트리 밖(중계 서비스 등)은 `FRAI_LLM_BASE_URL` 로 붙인다.
+  - ⚠️ **중계 서비스를 붙일 때는 반드시 실측한다.** 같은 모델 이름이라도 게이트웨이가 자체 시스템 프롬프트를 주입해 요청 한 줄에 prompt 4,400+ 토큰이 얹히는 경우를 실제로 확인했다(요청당 비용 8배). 단가도 프로바이더마다 다르므로 `FRAI_LLM_PRICE_*` 를 함께 지정해야 비용 기록이 맞는다.
   - ⚠️ 이 규격을 못 맞추는 프로바이더(Anthropic 네이티브 `/v1/messages` 등)는 어댑터를 따로 만든다. 레지스트리에 억지로 끼워 넣지 않는다 — 그러면 "표준"이 의미를 잃는다.
 
 **⚠️ 이 경로는 두 가지 전제를 깬다. 반드시 인지하고 설계한다.**
@@ -749,8 +751,8 @@ Tauri 시절 `.sig` 가 조용히 빠져 배포된 적이 있다. Electron 에�
   3. ✅ **그리드 멀티 세션 골격** — 세션별 프로바이더 선택, 브로드캐스트 입력, 서버경유/로컬 배지
   3-1. ✅ **세션 목록 (칸반 보드)** — 네이티브 메뉴 `보기`(⌘1/⌘2), 칸 추가·이름변경·삭제, 드래그로 세션 이동
   4. ✅ **getpes.com 릴레이 서버 구현** (PES 저장소) — 위 "릴레이 API 규약" 대로. 익명 5회 / 로그인 20회 + 전역 예산 상한.
-       두뇌는 OpenAI Chat Completions 규격으로 추상화되어 환경변수만으로 교체된다(기본 AKRouter).
-       ⚠️ **프로덕션에 `AKROUTER_API_KEY` 를 넣어야 실제로 동작한다.**
+       두뇌는 **DeepSeek v4 Flash 직결**이며, OpenAI Chat Completions 규격으로 추상화되어
+       환경변수만으로 교체된다. 키는 기존 `DEEPSEEK_API_KEY` 를 그대로 쓴다.
   4-1. ✅ **PES 호환 로그인** — 앱(`auth.rs`)과 서버(PES `/frai/auth` · `/frai/api/auth/{exchange,revoke}`) 양쪽 완료.
        마이그레이션 `0019` 는 **PES 배포 시 컨테이너 기동에서 자동 적용**된다.
   4-2. ⬜ **세션 목록 동기화** — `frai_sessions` · `frai_columns` 테이블 + API. 로그인 시 로컬 목록 merge
