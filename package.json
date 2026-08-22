@@ -16,10 +16,11 @@
     "check:security": "node scripts/check-security.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:all": "npm run check && npm run check:security && npm run test",
+    "test:all": "npm run check && npm run check:security && npm run check:theme && npm run test",
     "dist:mac": "npm run build && electron-builder --mac --arm64",
     "dist:win": "npm run build && electron-builder --win --x64",
-    "dist": "npm run build && electron-builder --mac --arm64 --win --x64"
+    "dist": "npm run build && electron-builder --mac --arm64 --win --x64",
+    "check:theme": "node scripts/check-theme.mjs"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.2.0",

@@ -277,7 +277,9 @@ button.ghost {
   color: var(--muted);
 }
 button.ghost:hover:not(:disabled) {
-  background: var(--surface-3);
+  /* ghost 는 어느 표면 위에나 놓인다(툴바·카드 헤더·칸반). 불투명 색을 쓰면
+     그중 한 곳에서 반드시 대비가 어긋난다. */
+  background: var(--overlay-hover);
   border-color: transparent;
   color: var(--fg);
 }

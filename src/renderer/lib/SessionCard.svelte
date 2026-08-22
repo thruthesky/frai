@@ -293,7 +293,7 @@
     color: var(--on-accent);
   }
   .pick:hover:not([aria-pressed='true']) {
-    background: var(--surface-3);
+    background: var(--overlay-hover);
     border-color: var(--line-strong);
   }
 
@@ -459,7 +459,9 @@
     color: var(--muted);
   }
   .chip:hover {
-    background: var(--panel-hover);
+    /* 카드 위에 얹히는 요소라 불투명 색이 아니라 막을 쓴다 — 표면 단계가 달라져도
+       대비가 일정하다. (--panel-hover 는 칸반 드롭 전용이므로 여기 쓰지 않는다.) */
+    background: var(--overlay-hover);
     border-color: var(--line-strong);
     color: var(--fg);
   }

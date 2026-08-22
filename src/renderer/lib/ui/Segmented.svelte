@@ -60,8 +60,10 @@
   .segmented {
     display: flex;
     gap: 2px;
-    background: var(--surface-3);
-    border-radius: var(--r-sm);
+    /* 컨테이너 배경(--surface-3) 위에 활성 배경(--surface-1)을 또 얹으면 배경이 두 겹이
+       되어 28px 짜리 컨트롤이 실제보다 무거워 보인다. 테두리 한 겹으로 묶고 안은 비운다. */
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
     padding: 2px;
   }
 
@@ -75,13 +77,13 @@
     min-width: 28px;
   }
   .segmented button:hover:not(.on) {
-    background: var(--surface-2);
+    background: var(--overlay-hover);
     color: var(--fg);
   }
   .segmented button.on {
-    background: var(--surface-1);
+    background: var(--overlay-active);
     color: var(--accent);
     font-weight: var(--fw-medium);
-    box-shadow: var(--shadow-1);
+    /* ⚠️ 그림자를 넣지 말 것. 28px 컨트롤에서는 층이 생기는 게 아니라 번져 보인다. */
   }
 </style>

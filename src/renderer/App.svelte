@@ -54,7 +54,6 @@
        앱이 같은 제품으로 읽히려면 이 색이 어긋나면 안 된다. -->
   <span class="mark" aria-hidden="true">F</span>
   <span class="brand">FRAI</span>
-  <span class="tagline">여러 인공지능을 한 화면에서</span>
 
   <span class="spacer"></span>
 
@@ -192,10 +191,9 @@
     letter-spacing: 0.04em;
     margin-inline-end: var(--space-1);
   }
-  .tagline {
-    font-size: var(--fs-sm);
-    color: var(--muted);
-  }
+  /* ⚠️ 태그라인("여러 인공지능을 한 화면에서")을 여기 되돌리지 말 것.
+     제품 설명은 처음 한 번 읽으면 끝인데 크롬의 가로폭을 영구히 차지한다.
+     그 문장이 필요한 곳은 앱 안이 아니라 랜딩(getpes.com/frai)이다. */
 
   .viewswitch {
     display: flex;
@@ -258,9 +256,13 @@
   .toolbar {
     display: flex;
     align-items: center;
-    gap: var(--space-3);
-    padding: var(--space-2) var(--space-3);
+    gap: var(--space-4);
+    /* 세로는 조이고 가로는 본문(그리드 패딩 16px)에 맞춘다. 크롬이 세로를 덜 먹을수록
+       대화가 보이는 높이가 늘어난다 — 이 앱에서 세로는 콘텐츠의 것이다. */
+    padding: var(--space-2) var(--space-4);
     background: var(--surface-2);
+    /* 타이틀바와 같은 배경이므로 경계선이 없어도 한 덩어리로 읽힌다. 선을 지우면
+       크롬과 본문의 대비가 선명해진다. */
     border-bottom: 1px solid var(--line);
   }
   .spacer {
@@ -287,15 +289,22 @@
     flex: 1;
     max-width: 720px;
   }
+  /* 입력과 나란히 서므로 곡률을 맞춘다. 다른 툴바 버튼(--r-md)과 달리 pill 이다. */
+  .broadcast :global(button) {
+    border-radius: var(--r-full);
+    padding-inline: var(--space-4);
+  }
   .broadcast input {
     flex: 1;
     background: var(--surface-1);
     color: var(--fg);
     border: 1px solid var(--line);
-    border-radius: var(--r-md);
-    padding: 7px var(--space-3);
+    /* 입력 카드 전용 라디우스. 툴바에서 가장 큰 요소이므로 형태로도 구분된다. */
+    border-radius: var(--r-xl);
+    padding: 9px var(--space-4);
     font: inherit;
-    font-size: var(--fs-md);
+    font-size: var(--fs-input);
+    line-height: var(--lh-base);
     transition:
       border-color var(--dur) var(--ease),
       box-shadow var(--dur) var(--ease);
@@ -363,11 +372,4 @@
     color: var(--accent);
   }
 
-  /* 좁은 창에서는 마케팅 문구를 숨긴다 — 앱 크롬에 카피가 있는 것 자체가
-     "웹사이트" 신호이고, 800px 에서는 자리도 없다. */
-  @media (max-width: 1100px) {
-    .tagline {
-      display: none;
-    }
-  }
 </style>
