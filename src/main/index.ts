@@ -8,7 +8,7 @@
 
 import { app, BrowserWindow, dialog, Menu, session as electronSession, shell } from 'electron'
 import updaterPkg from 'electron-updater'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Auth } from './auth/index.js'
 import { createSessionStore } from './auth/store.js'
@@ -18,7 +18,16 @@ import { setupAutoUpdate, type UpdaterHandle } from './updater.js'
 import { cspFor, DEV_URL as DEFAULT_DEV_URL } from '../shared/csp.js'
 import { IPC } from '../shared/types.js'
 
-const __dirname = fileURLToPath(new URL('.', import.meta.url))
+/**
+ * ⚠️ `new URL('.', import.meta.url)` 을 쓰지 말 것.
+ *
+ * Vite 는 그 패턴을 **에셋 참조로 특별 취급**한다. 첫 인자 `'.'` 을 번들할 파일로 오인해
+ * 소스 전체를 `data:` URL 로 인라인해 버리고, 그러면 `fileURLToPath` 가
+ * `ERR_INVALID_URL_SCHEME: The URL must be of scheme file` 로 죽는다 — **빌드는 성공하고
+ * 앱을 띄우는 순간에만 터진다**(2026-08-22 실측). 타입 검사·유닛 테스트로는 잡히지 않아
+ * `scripts/smoke-main.mjs` 가 실제 로드를 검사한다.
+ */
+const __dirname = dirname(fileURLToPath(import.meta.url))
 const isDev = !app.isPackaged
 const DEV_URL = process.env.FRAI_DEV_URL ?? DEFAULT_DEV_URL
 
@@ -30,6 +39,18 @@ const DEV_URL = process.env.FRAI_DEV_URL ?? DEFAULT_DEV_URL
  * 고쳐도 시험할 방법이 없어진다(Tauri 판에는 있던 기능이라 이식 누락이었다).
  */
 const RELAY_URL = process.env.FRAI_RELAY_URL?.trim() || undefined
+
+/**
+ * 스모크 모드 — **창을 띄우지 않고** main 이 끝까지 살아 오르는지만 확인한다.
+ *
+ * 왜 필요한가: 타입 검사도 유닛 테스트도 **번들을 실제로 로드하지 않는다.** 그래서
+ * "빌드는 성공하는데 앱을 켜면 죽는" 종류의 결함(모듈 최상단 예외, 잘못된 경로 해석,
+ * 번들러의 변환 사고)을 하나도 잡지 못한다 — 실제로 그렇게 배포한 적이 있다.
+ *
+ * `scripts/smoke-main.mjs` 가 이 환경변수를 켜고 Electron 을 띄운다. 창 생성만 건너뛰고
+ * IPC 등록·메뉴·업데이터 배선까지 전부 실행하므로, 그 경로의 예외도 함께 잡힌다.
+ */
+const SMOKE = process.env.FRAI_SMOKE_EXIT === '1'
 
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -145,6 +166,9 @@ if (!app.requestSingleInstanceLock()) {
     }
   })
 
+  // 스모크에서는 Dock 아이콘도 띄우지 않는다 — 사람 화면을 조금도 건드리지 않는다.
+  if (SMOKE && process.platform === 'darwin') app.dock?.hide()
+
   void app.whenReady().then(() => {
     electronSession.defaultSession.webRequest.onHeadersReceived((details, callback) => {
       callback({
@@ -170,7 +194,9 @@ if (!app.requestSingleInstanceLock()) {
 
     registerIpc({ sessions, auth, getWindow: () => mainWindow })
 
-    mainWindow = createWindow()
+    // 스모크는 창만 건너뛴다. 아래 메뉴·업데이터 배선은 그대로 실행해 그 경로의
+    // 예외까지 잡는다.
+    mainWindow = SMOKE ? null : createWindow()
 
     // 자동 업데이트. 정책은 `updater.ts` 에 있고 여기서는 실제 구현만 꽂는다.
     updater = setupAutoUpdate({
@@ -193,6 +219,13 @@ if (!app.requestSingleInstanceLock()) {
     })
 
     buildMenu(() => mainWindow)
+
+    if (SMOKE) {
+      // 이 줄이 찍혔다는 것은 모듈 로드부터 IPC·메뉴·업데이터 배선까지 전부 통과했다는 뜻이다.
+      console.info('[smoke] main 초기화 성공')
+      app.quit()
+      return
+    }
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) mainWindow = createWindow()
