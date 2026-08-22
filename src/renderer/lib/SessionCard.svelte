@@ -109,7 +109,7 @@
     </div>
 
     {#if provider?.leavesDevice}
-      <span class="tag warn" title="이 경로는 대화 내용이 getpes.com 서버를 지납니다.">
+      <span class="tag relay" title="이 경로는 대화 내용이 getpes.com 서버를 지납니다.">
         <Icon name="globe" size={11} />
         <span class="tag-label">서버 경유</span>
       </span>
@@ -340,9 +340,14 @@
     border-radius: var(--r-full);
     white-space: nowrap;
   }
-  .tag.warn {
-    background: var(--warn-bg);
-    color: var(--warn);
+  /* ⚠️ 예전에는 경고색(--warn)이었다. 그런데 이것은 경고가 아니라 **경로 표시**이고,
+     기본 AI 가 기본값이라 **모든 칸에 항상 뜬다.** 칸을 넷 펼치면 화면에서 가장 강한
+     색이 "이 세션은 서버를 지납니다" 라는 보조 정보가 되어 위계가 뒤집힌다
+     (2026-08-22 캡처로 확인). 고지는 남기되 소리를 낮춘다 — 읽히지만 튀지 않게. */
+  .tag.relay {
+    background: transparent;
+    border-color: var(--line);
+    color: var(--muted);
   }
   .tag.ok {
     background: var(--ok-bg);
@@ -431,11 +436,13 @@
     height: 38px;
     border-radius: var(--r-full);
     background: var(--surface-3);
-    color: var(--ok);
+    color: var(--muted);
     margin-block-end: var(--space-3);
   }
+  /* 배지와 같은 이유로 중립이다. 빈 화면에서 이 원 넷이 가장 강한 요소가 되면
+     "무엇을 물어볼까요?" 라는 진짜 안내가 묻힌다. */
   .empty-mark.relay {
-    color: var(--warn);
+    color: var(--muted);
   }
   .empty-hint {
     margin: 0;

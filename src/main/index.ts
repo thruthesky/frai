@@ -6,7 +6,7 @@
  *    모르기 때문에 창을 띄우지 않고 그대로 테스트된다. 이 경계를 깨지 말 것.
  */
 
-import { app, BrowserWindow, dialog, Menu, session as electronSession, shell } from 'electron'
+import { app, BrowserWindow, dialog, Menu, nativeTheme, session as electronSession, shell } from 'electron'
 import updaterPkg from 'electron-updater'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -52,6 +52,18 @@ const RELAY_URL = process.env.FRAI_RELAY_URL?.trim() || undefined
  */
 const SMOKE = process.env.FRAI_SMOKE_EXIT === '1'
 
+/**
+ * 캡처 모드 — **화면에 창을 띄우지 않고** 렌더 결과를 PNG 로 저장한다.
+ *
+ * 왜 필요한가: 이 프로젝트는 인공지능이 앱 창을 띄우지 않는 것이 절대 규칙이라, 그동안
+ * "화면이 어떻게 보이는가" 만은 사람에게 물을 수밖에 없었다. 그런데 **사람에게 확인을
+ * 시키는 것 자체가 금지**다(테스트 원칙). `show:false` + `capturePage()` 는 그 모순을
+ * 푼다 — 창은 화면에 나타나지 않고(Dock 아이콘도 숨긴다), 렌더는 실제로 일어난다.
+ *
+ * `FRAI_CAPTURE=<디렉터리>` 로 켜며 라이트·다크 두 장을 저장한다.
+ */
+const CAPTURE = process.env.FRAI_CAPTURE?.trim() || null
+
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
     width: 1400,
@@ -72,7 +84,24 @@ function createWindow(): BrowserWindow {
     }
   })
 
-  win.once('ready-to-show', () => win.show())
+  // 캡처 모드에서는 끝까지 보이지 않는다 — 렌더는 일어나지만 화면에는 나타나지 않는다.
+  win.once('ready-to-show', () => {
+    if (!CAPTURE) win.show()
+  })
+
+  // 진단 모드에서는 renderer 의 콘솔·로드 실패를 main 로그로 끌어온다.
+  // 이것이 없으면 캡처 결과가 흰 화면일 때 이유를 알 방법이 없다.
+  if (CAPTURE || SMOKE) {
+    win.webContents.on('console-message', (e) => {
+      console.info(`[renderer:${e.level}] ${e.message}${e.sourceId ? ` (${e.sourceId}:${e.lineNumber})` : ''}`)
+    })
+    win.webContents.on('did-fail-load', (_e, code, desc, url) => {
+      console.error(`[renderer] 로드 실패 ${code} ${desc} — ${url}`)
+    })
+    win.webContents.on('render-process-gone', (_e, details) => {
+      console.error(`[renderer] 프로세스 종료: ${details.reason}`)
+    })
+  }
 
   // 새 창·외부 링크는 앱 안에서 열지 않고 시스템 브라우저로 보낸다.
   win.webContents.setWindowOpenHandler(({ url }) => {
@@ -88,7 +117,8 @@ function createWindow(): BrowserWindow {
     }
   })
 
-  if (isDev) void win.loadURL(DEV_URL)
+  // 캡처는 dev 서버 없이도 돌아야 하므로 빌드된 renderer 를 직접 연다.
+  if (isDev && !CAPTURE) void win.loadURL(DEV_URL)
   else void win.loadFile(join(__dirname, '../renderer/index.html'))
 
   return win
@@ -155,6 +185,59 @@ function buildMenu(getWindow: () => BrowserWindow | null): void {
 let mainWindow: BrowserWindow | null = null
 let updater: UpdaterHandle | null = null
 
+/**
+ * 라이트·다크 두 테마를 각각 렌더해 PNG 로 저장한다.
+ *
+ * `nativeTheme.themeSource` 를 바꾸면 renderer 의 `prefers-color-scheme` 이 따라 바뀐다 —
+ * 실제 시스템 설정을 건드리지 않고 이 프로세스 안에서만 적용된다.
+ */
+async function captureThemes(win: BrowserWindow, dir: string): Promise<void> {
+  const { writeFile, mkdir } = await import('node:fs/promises')
+  const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+  try {
+    await mkdir(dir, { recursive: true })
+    // 로드가 끝나야 그릴 것이 생긴다.
+    if (win.webContents.isLoading()) {
+      await new Promise<void>((r) => win.webContents.once('did-finish-load', () => r()))
+    }
+
+    // 🛑 흰 화면을 "캡처 성공" 으로 보고하지 않는다. 실제로 무엇이 그려졌는지 확인한다.
+    const probe = (await win.webContents.executeJavaScript(`
+      (() => {
+        const app = document.querySelector('#app')
+        return {
+          html: document.documentElement.outerHTML.length,
+          appChildren: app ? app.children.length : -1,
+          text: (document.body.innerText || '').trim().slice(0, 120),
+          hasFrai: typeof window.frai
+        }
+      })()
+    `)) as { html: number; appChildren: number; text: string; hasFrai: string }
+    console.info(`[capture] DOM 점검: #app 자식 ${probe.appChildren}개 · window.frai=${probe.hasFrai}`)
+    console.info(`[capture] 보이는 글자: ${JSON.stringify(probe.text)}`)
+    if (probe.appChildren <= 0) {
+      throw new Error(`renderer 가 아무것도 그리지 않았다(#app 자식 ${probe.appChildren}개) — 흰 화면이다`)
+    }
+
+    for (const theme of ['light', 'dark'] as const) {
+      nativeTheme.themeSource = theme
+      // 테마 전환 후 스타일이 반영되고 폰트가 자리 잡을 시간을 준다.
+      await wait(700)
+      const image = await win.webContents.capturePage()
+      const file = join(dir, `frai-${theme}.png`)
+      await writeFile(file, image.toPNG())
+      console.info(`[capture] ${theme} → ${file}`)
+    }
+    console.info('[capture] 완료')
+  } catch (e) {
+    console.error(`[capture] 실패: ${e instanceof Error ? e.message : String(e)}`)
+    process.exitCode = 1
+  } finally {
+    app.quit()
+  }
+}
+
 // 두 인스턴스가 동시에 뜨면 기기 ID·세션 파일을 두고 경합한다.
 if (!app.requestSingleInstanceLock()) {
   app.quit()
@@ -167,7 +250,7 @@ if (!app.requestSingleInstanceLock()) {
   })
 
   // 스모크에서는 Dock 아이콘도 띄우지 않는다 — 사람 화면을 조금도 건드리지 않는다.
-  if (SMOKE && process.platform === 'darwin') app.dock?.hide()
+  if ((SMOKE || CAPTURE) && process.platform === 'darwin') app.dock?.hide()
 
   void app.whenReady().then(() => {
     electronSession.defaultSession.webRequest.onHeadersReceived((details, callback) => {
@@ -224,6 +307,11 @@ if (!app.requestSingleInstanceLock()) {
       // 이 줄이 찍혔다는 것은 모듈 로드부터 IPC·메뉴·업데이터 배선까지 전부 통과했다는 뜻이다.
       console.info('[smoke] main 초기화 성공')
       app.quit()
+      return
+    }
+
+    if (CAPTURE && mainWindow) {
+      void captureThemes(mainWindow, CAPTURE)
       return
     }
 

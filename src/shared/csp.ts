@@ -21,6 +21,12 @@ export const DEV_HMR_URL = 'ws://localhost:1421'
 export interface CspOptions {
   /** 개발 서버(HMR)를 허용할지. 배포 빌드는 false. */
   dev: boolean
+  /**
+   * `<meta http-equiv>` 로 넣을 것인가.
+   * `frame-ancestors` 는 **meta 로는 무시되고 콘솔 경고만 남기므로** 그때는 뺀다.
+   * (헤더로 보낼 때는 유효하므로 그대로 둔다.)
+   */
+  forMeta?: boolean
   /** 개발 서버 주소. 기본은 `DEV_URL`. */
   devUrl?: string
   /**
@@ -63,7 +69,8 @@ export function cspFor(opts: CspOptions): string {
     `connect-src ${connect}`,
     "object-src 'none'",
     `base-uri ${selfSrc}`,
-    "frame-ancestors 'none'",
+    // meta 에서는 무시되는 지시어라 넣지 않는다(넣으면 콘솔 경고만 쌓인다).
+    ...(opts.forMeta ? [] : ["frame-ancestors 'none'"]),
     "form-action 'none'"
   ].join('; ')
 }

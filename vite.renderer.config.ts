@@ -18,7 +18,7 @@ function cspMetaPlugin(): Plugin {
       order: 'pre',
       handler(html, ctx) {
         if (ctx.server) return html // 개발 서버는 헤더가 담당한다
-        const meta = `<meta http-equiv="Content-Security-Policy" content="${cspFor({ dev: false })}" />`
+        const meta = `<meta http-equiv="Content-Security-Policy" content="${cspFor({ dev: false, forMeta: true })}" />`
         return html.replace('<head>', `<head>\n    ${meta}`)
       }
     }
@@ -29,6 +29,14 @@ function cspMetaPlugin(): Plugin {
 export default defineConfig({
   // root 가 src/renderer 라 루트의 svelte.config.js 를 자동으로 찾지 못한다.
   plugins: [svelte({ configFile: '../../svelte.config.js' }), cspMetaPlugin()],
+
+  // 🛑 `base: './'` 를 빼지 말 것.
+  //
+  // 기본값(`/`)이면 빌드 산출물이 `/assets/index-xxx.js` 라는 **루트 절대 경로**를 낸다.
+  // 배포본은 `loadFile()` 로 여는 `file://` 이므로 그 경로는 **디스크 루트**를 가리키고,
+  // 스크립트·CSS 가 통째로 404 가 되어 **흰 화면**이 뜬다. 개발 모드(http)에서는 멀쩡히
+  // 동작하므로 눈치채기 어렵다 — 2026-08-22 캡처 검증에서 처음 발견했다.
+  base: './',
 
   // renderer 만 담당한다. main·preload 는 각자 vite.*.config.ts 로 빌드한다.
   root: 'src/renderer',

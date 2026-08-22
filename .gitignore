@@ -49,3 +49,6 @@ src-tauri/gen/
 *.njsproj
 *.sln
 *.sw?
+
+# 화면 캡처 산출물(검증용, 커밋하지 않는다)
+.captures/

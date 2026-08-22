@@ -21,7 +21,8 @@
     "dist:win": "npm run build && electron-builder --win --x64",
     "dist": "npm run build && electron-builder --mac --arm64 --win --x64",
     "check:theme": "node scripts/check-theme.mjs",
-    "smoke:main": "node scripts/smoke-main.mjs"
+    "smoke:main": "node scripts/smoke-main.mjs",
+    "capture": "node scripts/capture.mjs"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.2.0",
